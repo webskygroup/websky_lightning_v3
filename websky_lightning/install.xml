@@ -2,26 +2,37 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.0.0</version>
+  <version>1.5.2</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
-  <file path="system/library/response.php">
-    <operation>
-      <search><![CDATA[$this->output = $output;]]></search>
+  <file path="catalog/controller/startup/startup.php">
+    <operation error="log">
+      <search><![CDATA[// Theme]]></search>
       <add position="before"><![CDATA[
-if ($this->config->get('websky_lightning_page_cache') && !headers_sent() && empty($_COOKIE) && in_array($this->request->server['REQUEST_METHOD'], array('GET','HEAD')) && empty($this->request->get['route']) && stripos($output, '<html') !== false) { $cache_dir = DIR_CACHE . 'websky_lightning/'; if (!is_dir($cache_dir)) @mkdir($cache_dir, 0777, true); $cache_file = $cache_dir . md5(isset($this->request->server['REQUEST_URI']) ? $this->request->server['REQUEST_URI'] : '/') . '.html'; if (is_file($cache_file) && filemtime($cache_file) > time() - 900) { $output = file_get_contents($cache_file); } else { @file_put_contents($cache_file, $output, LOCK_EX); } }
-if ($this->config->get('websky_lightning_status') && !headers_sent() && !empty($output) && stripos($output, '<html') !== false && empty($_SERVER['HTTP_X_REQUESTED_WITH']) && empty($_COOKIE)) {
-    $output = preg_replace('/<!--[\\s\\S]*?-->/', '', $output);
-    $output = preg_replace('/[\\t ]+/', ' ', $output);
-    $output = preg_replace('/>\\s+</', '><', $output);
-}
-]]></add>
+        if (is_file(DIR_SYSTEM . 'library/websky_lightning.php')) {
+            require_once(DIR_SYSTEM . 'library/websky_lightning.php');
+            WebskyLightning::serve($this->registry);
+        }
+
+        ]]></add>
     </operation>
   </file>
-  <file path="system/library/image.php">
-    <operation>
-      <search><![CDATA[public function save($file, $quality = 90) {]]></search>
-      <add position="after"><![CDATA[if ($this->config->get('websky_lightning_webp') && function_exists('imagewebp')) { $webp = preg_replace('/\\.(jpe?g|png)$/i', '.webp', $file); if ($webp !== $file) @imagewebp($this->image, $webp, (int)$quality); }]]></add>
+  <file path="catalog/model/tool/image.php">
+    <operation error="log">
+      <search><![CDATA[$image_new = str_replace(' ', '%20', $image_new);]]></search>
+      <add position="before"><![CDATA[
+        if ($this->config->get('module_websky_lightning_status') && $this->config->get('module_websky_lightning_webp') && !empty($this->request->server['HTTP_ACCEPT']) && strpos($this->request->server['HTTP_ACCEPT'], 'image/webp') !== false && is_file(DIR_SYSTEM . 'library/websky_lightning.php')) {
+            require_once(DIR_SYSTEM . 'library/websky_lightning.php');
+            $websky_file = WebskyLightning::webp(DIR_IMAGE . $image_new);
+            if ($websky_file !== DIR_IMAGE . $image_new) { $image_new = substr($websky_file, strlen(DIR_IMAGE)); }
+        }
+
+        ]]></add>
     </operation>
+  </file>
+  <file path="admin/view/template/common/header.twig">
+    <operation error="log"><search><![CDATA[<ul class="nav navbar-nav navbar-right">]]></search><add position="after"><![CDATA[
+        {% include 'extension/dashboard/websky_lightning_header.twig' %}
+      ]]></add></operation>
   </file>
 </modification>

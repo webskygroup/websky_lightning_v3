@@ -7,3 +7,15 @@ $_['entry_page_cache'] = 'Full page cache'; $_['entry_query_cache'] = 'Database 
 $_['button_save'] = 'Save';
 $_['button_cancel'] = 'Cancel';
 $_['error_permission'] = 'Warning: You do not have permission to modify Websky Lightning.';
+$_['text_enabled'] = 'Enabled'; $_['text_disabled'] = 'Disabled';
+$_['text_dashboard'] = 'Performance dashboard'; $_['text_cache_files'] = 'Cached pages'; $_['text_cache_size'] = 'Cache size'; $_['text_webp_support'] = 'WebP support'; $_['text_db_driver'] = 'Database driver'; $_['text_version'] = 'Version'; $_['text_on'] = 'Available'; $_['text_off'] = 'Unavailable';
+$_['text_help'] = 'Enable features gradually and compare server response time before and after activation.';
+$_['text_report'] = 'Advanced performance report'; $_['text_environment'] = 'Server environment'; $_['text_benchmark'] = 'Load benchmark'; $_['text_before'] = 'Before'; $_['text_after'] = 'After'; $_['text_no_data'] = 'No benchmark recorded'; $_['text_recommendations'] = 'Smart recommendations';
+$_['text_php_version'] = 'PHP version'; $_['text_memory_limit'] = 'Memory limit'; $_['text_opcache'] = 'OPcache'; $_['text_gzip'] = 'Gzip'; $_['text_database_size'] = 'Database size'; $_['text_database_overhead'] = 'Database overhead'; $_['text_server'] = 'Web server';
+$_['text_avg'] = 'Average'; $_['text_min'] = 'Minimum'; $_['text_max'] = 'Maximum'; $_['text_http'] = 'HTTP status'; $_['text_response_size'] = 'Response size'; $_['text_improvement'] = 'Improvement';
+$_['button_test_before'] = 'Record baseline'; $_['button_test_after'] = 'Test optimized'; $_['button_clear_cache'] = 'Clear cache'; $_['button_refresh'] = 'Refresh report';
+$_['recommend_opcache'] = 'Enable PHP OPcache to reduce script compilation time.'; $_['recommend_webp'] = 'Install GD WebP support before enabling image conversion.'; $_['recommend_memory'] = 'Increase PHP memory_limit to at least 128 MB.'; $_['recommend_good'] = 'Core server capabilities are available; continue with staged tests.';
+$_['text_update'] = 'Updates'; $_['text_current_version'] = 'Current version'; $_['text_latest_version'] = 'Latest version'; $_['text_release_date'] = 'Release date'; $_['text_changelog'] = 'Release notes'; $_['text_update_status'] = 'Update status';
+$_['text_up_to_date'] = 'Websky Lightning is up to date.'; $_['text_update_available'] = 'A newer version is available.'; $_['text_update_unavailable'] = 'Could not contact the update service. The installed version remains active.';
+$_['button_download_update'] = 'Download update'; $_['button_check_update'] = 'Check again';
+$_['text_cpu_load'] = 'CPU load'; $_['text_cache_hit_rate'] = 'Cache hit rate'; $_['text_cached_pages_graph'] = 'Cached pages'; $_['text_live_overview'] = 'Live performance overview'; $_['text_hits'] = 'Hits'; $_['text_misses'] = 'Misses';

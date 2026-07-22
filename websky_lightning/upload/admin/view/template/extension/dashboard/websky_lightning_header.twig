@@ -1,0 +1,44 @@
+<li class="dropdown wlh-nav">
+  <a href="#" class="dropdown-toggle wlh-trigger" data-toggle="dropdown" title="وب‌اسکای لایتنینگ" aria-label="وب‌اسکای لایتنینگ">
+    <span class="wlh-icon"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#38bdf8" d="M12 16h7l4 23h26l5-17H25l-1.4-7H12z"/><circle cx="29" cy="48" r="4" fill="#2563eb"/><circle cx="46" cy="48" r="4" fill="#2563eb"/><path d="M37 4 24 28h10l-4 22 18-29H37z" fill="#fbbf24" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></span>
+    <span class="wlh-badge">—</span>
+  </a>
+  <ul class="dropdown-menu dropdown-menu-right wlh-menu">
+    <li class="wlh-head"><span class="wlh-mark"><i class="fa fa-bolt"></i></span><div><strong>وب‌اسکای لایتنینگ</strong><small>مانیتور زنده عملکرد و کش</small></div></li>
+    <li class="wlh-stats">
+      <div class="wlh-stat"><span class="wlh-ring wlh-cpu" style="--value:0"><b>—</b></span><div><strong>پردازنده</strong><small class="wlh-cpu-detail">در حال دریافت...</small></div></div>
+      <div class="wlh-stat"><span class="wlh-ring wlh-hit" style="--value:0"><b>—</b></span><div><strong>نرخ اصابت کش</strong><small class="wlh-hit-detail">در حال دریافت...</small></div></div>
+      <div class="wlh-stat"><span class="wlh-ring wlh-pages" style="--value:0"><b>—</b></span><div><strong>صفحات کش‌شده</strong><small class="wlh-pages-detail">در حال دریافت...</small></div></div>
+    </li>
+    <li class="wlh-actions"><button type="button" class="btn btn-danger btn-sm wlh-clear"><i class="fa fa-trash-o"></i> پاک‌سازی کش</button><a href="#" class="btn btn-primary btn-sm wlh-settings"><i class="fa fa-cog"></i> تنظیمات</a></li>
+    <li class="wlh-note"><i class="fa fa-circle"></i> ماژول فعال و در حال پایش است</li>
+  </ul>
+</li>
+<style>
+.wlh-nav{direction:rtl}.wlh-trigger{height:50px!important;padding:7px 13px!important;position:relative}.wlh-icon{display:inline-flex;width:36px;height:36px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:50%;padding:3px;box-shadow:0 3px 10px rgba(37,99,235,.2)}.wlh-icon svg{width:100%;height:100%}.wlh-badge{position:absolute;top:3px;right:5px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;line-height:17px;text-align:center}.wlh-menu{width:340px;padding:0;border:0;border-radius:0 0 12px 12px;overflow:hidden;box-shadow:0 14px 35px rgba(15,23,42,.25);color:#1e293b}.wlh-head{display:flex!important;align-items:center;padding:16px!important;background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff}.wlh-mark{width:42px;height:42px;border-radius:12px;background:#fbbf24;color:#172554;display:inline-flex;align-items:center;justify-content:center;font-size:22px;margin-left:10px}.wlh-head strong,.wlh-head small{display:block}.wlh-head strong{font-size:15px}.wlh-head small{opacity:.72;margin-top:3px}.wlh-stats{display:block!important;padding:8px 16px!important}.wlh-stat{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #eef2f7}.wlh-stat:last-child{border-bottom:0}.wlh-stat>div strong,.wlh-stat>div small{display:block}.wlh-stat>div small{direction:ltr;text-align:right;color:#64748b;margin-top:3px;font-size:11px}.wlh-ring{--value:0;width:52px;height:52px;min-width:52px;border-radius:50%;margin-left:12px;background:conic-gradient(#38bdf8 calc(var(--value)*1%),#e2e8f0 0);display:grid;place-items:center;position:relative}.wlh-ring:before{content:'';position:absolute;inset:5px;border-radius:50%;background:#fff}.wlh-ring b{position:relative;font-size:12px}.wlh-hit{background:conic-gradient(#10b981 calc(var(--value)*1%),#e2e8f0 0)}.wlh-pages{background:conic-gradient(#f59e0b calc(var(--value)*1%),#e2e8f0 0)}.wlh-actions{display:flex!important;gap:8px;padding:12px 16px!important;background:#f8fafc;border-top:1px solid #eef2f7}.wlh-actions .btn{flex:1}.wlh-note{display:block!important;padding:9px 16px!important;text-align:center;color:#64748b;font-size:11px}.wlh-note i{color:#10b981;font-size:8px;margin-left:5px}@media(max-width:480px){.wlh-menu{width:300px}}
+</style>
+<script>
+function webskyLightningToken() { var match = window.location.href.match(/[?&]user_token=([^&#]+)/); return match ? decodeURIComponent(match[1]) : ''; }
+function webskyLightningUrl(method) { return 'index.php?route=extension/module/websky_lightning/' + method + '&user_token=' + encodeURIComponent(webskyLightningToken()); }
+function webskyLightningRefresh() {
+  $.getJSON(webskyLightningUrl('headerStats'), function(json) {
+    if (!json || !json.success) return;
+    $('.wlh-badge').text(json.pages);
+    $('.wlh-cpu').css('--value', json.cpu).find('b').text(json.cpu + '%');
+    $('.wlh-cpu-detail').text('Load ' + json.load + ' / ' + json.cores + ' Core');
+    $('.wlh-hit').css('--value', json.hit_rate).find('b').text(json.hit_rate + '%');
+    $('.wlh-hit-detail').text(json.hits + ' HIT · ' + json.misses + ' MISS');
+    $('.wlh-pages').css('--value', Math.min(100, json.pages)).find('b').text(json.pages);
+    $('.wlh-pages-detail').text(json.size);
+  });
+}
+$(document).on('shown.bs.dropdown', '.wlh-nav', webskyLightningRefresh);
+$(document).on('click', '.wlh-settings', function(e) { e.preventDefault(); window.location.href = 'index.php?route=extension/module/websky_lightning&user_token=' + encodeURIComponent(webskyLightningToken()); });
+$(document).on('click', '.wlh-clear', function(e) {
+  e.preventDefault(); e.stopPropagation();
+  var button = $(this); button.prop('disabled', true).find('i').attr('class', 'fa fa-spinner fa-spin');
+  $.post(webskyLightningUrl('clearCache'), {}, function(json) {
+    if (json && json.success) { $('.wlh-badge').text('0'); $('.wlh-pages b').text('0'); $('.wlh-pages').next().find('small').text('0 B'); }
+  }, 'json').always(function() { button.prop('disabled', false).find('i').attr('class', 'fa fa-trash-o'); });
+});
+</script>
