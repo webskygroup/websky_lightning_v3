@@ -9,12 +9,19 @@
     <operation>
       <search><![CDATA[$this->output = $output;]]></search>
       <add position="before"><![CDATA[
+if ($this->config->get('websky_lightning_page_cache') && !headers_sent() && empty($_COOKIE) && in_array($this->request->server['REQUEST_METHOD'], array('GET','HEAD')) && empty($this->request->get['route']) && stripos($output, '<html') !== false) { $cache_dir = DIR_CACHE . 'websky_lightning/'; if (!is_dir($cache_dir)) @mkdir($cache_dir, 0777, true); $cache_file = $cache_dir . md5(isset($this->request->server['REQUEST_URI']) ? $this->request->server['REQUEST_URI'] : '/') . '.html'; if (is_file($cache_file) && filemtime($cache_file) > time() - 900) { $output = file_get_contents($cache_file); } else { @file_put_contents($cache_file, $output, LOCK_EX); } }
 if ($this->config->get('websky_lightning_status') && !headers_sent() && !empty($output) && stripos($output, '<html') !== false && empty($_SERVER['HTTP_X_REQUESTED_WITH']) && empty($_COOKIE)) {
     $output = preg_replace('/<!--[\\s\\S]*?-->/', '', $output);
     $output = preg_replace('/[\\t ]+/', ' ', $output);
     $output = preg_replace('/>\\s+</', '><', $output);
 }
 ]]></add>
+    </operation>
+  </file>
+  <file path="system/library/image.php">
+    <operation>
+      <search><![CDATA[public function save($file, $quality = 90) {]]></search>
+      <add position="after"><![CDATA[if ($this->config->get('websky_lightning_webp') && function_exists('imagewebp')) { $webp = preg_replace('/\\.(jpe?g|png)$/i', '.webp', $file); if ($webp !== $file) @imagewebp($this->image, $webp, (int)$quality); }]]></add>
     </operation>
   </file>
 </modification>

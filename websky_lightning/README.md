@@ -8,4 +8,4 @@ Independent performance module for OpenCart 3.0.3.x. This first release provides
 2. Refresh **Extensions → Modifications**.
 3. Install and enable **Websky Lightning** under Extensions → Extensions → Modules.
 
-No credentials or external services are required.
+No external services are required. Page cache is conservative (15 minutes and disabled for cookies/AJAX). The optional cron endpoint is `index.php?route=extension/module/websky_lightning_cron&token=...`; protect its token in admin configuration before scheduling it.

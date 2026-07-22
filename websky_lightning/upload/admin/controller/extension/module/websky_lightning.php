@@ -12,12 +12,13 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         }
         $data['heading_title'] = $this->language->get('heading_title');
         $data['text_edit'] = $this->language->get('text_edit');
-        $data['entry_status'] = $this->language->get('entry_status');
+        $data['entry_status'] = $this->language->get('entry_status'); $data['entry_page_cache'] = $this->language->get('entry_page_cache'); $data['entry_query_cache'] = $this->language->get('entry_query_cache'); $data['entry_webp'] = $this->language->get('entry_webp');
         $data['button_save'] = $this->language->get('button_save');
         $data['button_cancel'] = $this->language->get('button_cancel');
         $data['action'] = $this->url->link('extension/module/websky_lightning', 'user_token=' . $this->session->data['user_token'], true);
         $data['cancel'] = $this->url->link('extension/extension', 'user_token=' . $this->session->data['user_token'] . '&type=module', true);
         $data['websky_lightning_status'] = isset($this->request->post['websky_lightning_status']) ? $this->request->post['websky_lightning_status'] : $this->config->get('websky_lightning_status');
+        foreach (array('page_cache','query_cache','webp') as $key) { $data['websky_lightning_'.$key] = isset($this->request->post['websky_lightning_'.$key]) ? $this->request->post['websky_lightning_'.$key] : $this->config->get('websky_lightning_'.$key); }
         $data['header'] = $this->load->controller('common/header'); $data['column_left'] = $this->load->controller('common/column_left'); $data['footer'] = $this->load->controller('common/footer');
         $this->response->setOutput($this->load->view('extension/module/websky_lightning', $data));
     }
