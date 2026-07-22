@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.5.3</version>
+  <version>1.6.0</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -11,10 +11,34 @@
       <add position="before"><![CDATA[
         if (is_file(DIR_SYSTEM . 'library/websky_lightning.php')) {
             require_once(DIR_SYSTEM . 'library/websky_lightning.php');
+            if (!defined('WEBSKY_LIGHTNING_QUERY_CACHE')) { define('WEBSKY_LIGHTNING_QUERY_CACHE', (bool)$this->config->get('module_websky_lightning_query_cache')); }
             WebskyLightning::serve($this->registry);
         }
 
         ]]></add>
+    </operation>
+  </file>
+  <file path="system/library/db.php">
+    <operation error="skip">
+      <search><![CDATA[$result = $this->adaptor->query($sql);]]></search>
+      <add position="replace"><![CDATA[
+        if (is_file(DIR_SYSTEM . 'library/websky_lightning.php')) {
+            require_once(DIR_SYSTEM . 'library/websky_lightning.php');
+            $result = WebskyLightning::databaseQuery($this->adaptor, $sql);
+        } else {
+            $result = $this->adaptor->query($sql);
+        }
+      ]]></add>
+    </operation>
+    <operation error="log">
+      <search><![CDATA[return $this->adaptor->query($sql);]]></search>
+      <add position="replace"><![CDATA[
+        if (is_file(DIR_SYSTEM . 'library/websky_lightning.php')) {
+            require_once(DIR_SYSTEM . 'library/websky_lightning.php');
+            return WebskyLightning::databaseQuery($this->adaptor, $sql);
+        }
+        return $this->adaptor->query($sql);
+      ]]></add>
     </operation>
   </file>
   <file path="catalog/model/tool/image.php">

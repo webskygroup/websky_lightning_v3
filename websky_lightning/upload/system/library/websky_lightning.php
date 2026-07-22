@@ -74,6 +74,95 @@ class WebskyLightning {
         return $dir;
     }
 
+    public static function databaseQuery($adaptor, $sql) {
+        $trimmed = ltrim((string)$sql);
+        if (preg_match('/^(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|CREATE|DROP|RENAME)\b/i', $trimmed)) {
+            $result = $adaptor->query($sql);
+            self::invalidateDatabaseCache();
+            return $result;
+        }
+
+        if (!defined('WEBSKY_LIGHTNING_QUERY_CACHE') || !WEBSKY_LIGHTNING_QUERY_CACHE || !self::cacheableDatabaseQuery($trimmed)) {
+            return $adaptor->query($sql);
+        }
+
+        $dir = self::databaseCacheDirectory();
+        $generation = self::databaseCacheGeneration($dir);
+        $file = $dir . hash('sha256', $generation . '|' . $trimmed) . '.qcache';
+        $ttl = 300;
+        if (is_file($file) && filemtime($file) >= time() - $ttl) {
+            $cached = @unserialize((string)@file_get_contents($file));
+            if (is_array($cached) && isset($cached['rows'], $cached['num_rows'])) {
+                self::recordDatabaseCache('hit');
+                $query = new \stdClass();
+                $query->row = isset($cached['row']) ? $cached['row'] : array();
+                $query->rows = $cached['rows'];
+                $query->num_rows = (int)$cached['num_rows'];
+                return $query;
+            }
+        }
+
+        self::recordDatabaseCache('miss');
+        $query = $adaptor->query($sql);
+        if (is_object($query) && isset($query->rows, $query->num_rows)) {
+            $payload = serialize(array('row' => isset($query->row) ? $query->row : array(), 'rows' => $query->rows, 'num_rows' => (int)$query->num_rows));
+            $tmp = $file . '.' . getmypid() . '.tmp';
+            if (@file_put_contents($tmp, $payload, LOCK_EX) !== false) { @rename($tmp, $file); } else { @unlink($tmp); }
+        }
+        if (mt_rand(1, 200) === 1) { self::pruneDatabaseCache($dir); }
+        return $query;
+    }
+
+    public static function invalidateDatabaseCache() {
+        $dir = self::databaseCacheDirectory();
+        $file = $dir . 'generation';
+        $handle = @fopen($file, 'c+');
+        if (!$handle) { return; }
+        if (@flock($handle, LOCK_EX)) {
+            $value = (int)trim((string)stream_get_contents($handle));
+            ftruncate($handle, 0); rewind($handle); fwrite($handle, (string)($value + 1)); fflush($handle); flock($handle, LOCK_UN);
+        }
+        fclose($handle);
+    }
+
+    private static function cacheableDatabaseQuery($sql) {
+        if (!preg_match('/^(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN)\b/i', $sql)) { return false; }
+        if (preg_match('/\b(FOR\s+UPDATE|LOCK\s+IN\s+SHARE|INTO\s+OUTFILE|SQL_NO_CACHE|SQL_CALC_FOUND_ROWS)\b/i', $sql)) { return false; }
+        if (preg_match('/\b(RAND|NOW|CURDATE|CURTIME|CURRENT_TIMESTAMP|UNIX_TIMESTAMP|LAST_INSERT_ID|FOUND_ROWS|CONNECTION_ID|UUID)\s*\(/i', $sql)) { return false; }
+        return true;
+    }
+
+    private static function databaseCacheDirectory() {
+        $storage = defined('DIR_STORAGE') ? DIR_STORAGE : dirname(rtrim(DIR_CACHE, '/\\')) . DIRECTORY_SEPARATOR;
+        $dir = rtrim($storage, '/\\') . DIRECTORY_SEPARATOR . 'websky_lightning_db_cache' . DIRECTORY_SEPARATOR;
+        if (!is_dir($dir)) { @mkdir($dir, 0755, true); }
+        return $dir;
+    }
+
+    private static function databaseCacheGeneration($dir) {
+        $file = $dir . 'generation';
+        if (!is_file($file)) { @file_put_contents($file, '1', LOCK_EX); }
+        return max(1, (int)trim((string)@file_get_contents($file)));
+    }
+
+    private static function recordDatabaseCache($type) {
+        $file = self::databaseCacheDirectory() . 'stats.json';
+        $handle = @fopen($file, 'c+');
+        if (!$handle) { return; }
+        if (@flock($handle, LOCK_EX)) {
+            $stats = json_decode((string)stream_get_contents($handle), true);
+            if (!is_array($stats)) { $stats = array('hit' => 0, 'miss' => 0); }
+            $stats[$type] = isset($stats[$type]) ? (int)$stats[$type] + 1 : 1;
+            $stats['updated'] = time();
+            ftruncate($handle, 0); rewind($handle); fwrite($handle, json_encode($stats)); fflush($handle); flock($handle, LOCK_UN);
+        }
+        fclose($handle);
+    }
+
+    private static function pruneDatabaseCache($dir) {
+        foreach (glob($dir . '*.qcache') ?: array() as $file) { if (is_file($file) && filemtime($file) < time() - 86400) { @unlink($file); } }
+    }
+
     private static function eligible($registry) {
         $request = $registry->get('request');
         $session = $registry->get('session');
