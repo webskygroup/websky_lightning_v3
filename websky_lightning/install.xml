@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<modification>
+  <name>Websky Lightning</name>
+  <code>websky_lightning</code>
+  <version>1.0.0</version>
+  <author>Websky</author>
+  <link>https://github.com/webskygroup</link>
+  <file path="system/library/response.php">
+    <operation>
+      <search><![CDATA[$this->output = $output;]]></search>
+      <add position="before"><![CDATA[
+if ($this->config->get('websky_lightning_status') && !headers_sent() && !empty($output) && stripos($output, '<html') !== false && empty($_SERVER['HTTP_X_REQUESTED_WITH']) && empty($_COOKIE)) {
+    $output = preg_replace('/<!--[\\s\\S]*?-->/', '', $output);
+    $output = preg_replace('/[\\t ]+/', ' ', $output);
+    $output = preg_replace('/>\\s+</', '><', $output);
+}
+]]></add>
+    </operation>
+  </file>
+</modification>
