@@ -58,6 +58,22 @@ class WebskyLightning {
         return $ok && is_file($webp) ? $webp : $file;
     }
 
+    public static function cacheDirectory() {
+        $storage = defined('DIR_STORAGE') ? DIR_STORAGE : dirname(rtrim(DIR_CACHE, '/\\')) . DIRECTORY_SEPARATOR;
+        $dir = rtrim($storage, '/\\') . DIRECTORY_SEPARATOR . 'websky_lightning_cache' . DIRECTORY_SEPARATOR;
+        if (!is_dir($dir)) { @mkdir($dir, 0755, true); }
+
+        $legacy = rtrim(DIR_CACHE, '/\\') . DIRECTORY_SEPARATOR . 'websky_lightning' . DIRECTORY_SEPARATOR;
+        if (is_dir($legacy) && is_dir($dir)) {
+            foreach (glob($legacy . '*') ?: array() as $file) {
+                if (!is_file($file)) { continue; }
+                $target = $dir . basename($file);
+                if (!is_file($target)) { @rename($file, $target) || @copy($file, $target); }
+            }
+        }
+        return $dir;
+    }
+
     private static function eligible($registry) {
         $request = $registry->get('request');
         $session = $registry->get('session');
@@ -77,7 +93,7 @@ class WebskyLightning {
         $currency = $session && isset($session->data['currency']) ? $session->data['currency'] : $config->get('config_currency');
         $acceptsWebp = !empty($request->server['HTTP_ACCEPT']) && strpos($request->server['HTTP_ACCEPT'], 'image/webp') !== false ? 'webp' : 'legacy';
         $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $uri;
-        return DIR_CACHE . 'websky_lightning/' . hash('sha256', $key) . '.html';
+        return self::cacheDirectory() . hash('sha256', $key) . '.html';
     }
 
     private static function catalogRequest() {
@@ -85,7 +101,7 @@ class WebskyLightning {
     }
 
     private static function record($type) {
-        $file = DIR_CACHE . 'websky_lightning_stats.json';
+        $file = self::cacheDirectory() . 'stats.json';
         $handle = @fopen($file, 'c+');
         if (!$handle) { return; }
         if (@flock($handle, LOCK_EX)) {

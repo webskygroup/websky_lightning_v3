@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.5.2';
+    private $version = '1.5.3';
 
     public function index() {
         $this->load->language('extension/module/websky_lightning');
@@ -108,9 +108,9 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         if (!$this->validate()) {
             $json['error'] = $this->language->get('error_permission');
         } else {
-            $dir = DIR_CACHE . 'websky_lightning/'; $count = 0;
+            $dir = $this->pageCacheDir(); $count = 0;
             foreach (glob($dir . '*') ?: array() as $file) { if (is_file($file) && @unlink($file)) { $count++; } }
-            @unlink(DIR_CACHE . 'websky_lightning_stats.json');
+            @unlink($dir . 'stats.json');
             $json = array('success' => true, 'cleared' => $count);
         }
         $this->response->addHeader('Content-Type: application/json');
@@ -213,7 +213,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         return $result;
     }
 
-    private function cacheStats() { $files = glob(DIR_CACHE . 'websky_lightning/*') ?: array(); $bytes = 0; foreach ($files as $file) { if (is_file($file)) { $bytes += filesize($file); } } return array('files' => count($files), 'bytes' => $bytes); }
+    private function cacheStats() { $files = glob($this->pageCacheDir() . '*.html') ?: array(); $bytes = 0; foreach ($files as $file) { if (is_file($file)) { $bytes += filesize($file); } } return array('files' => count($files), 'bytes' => $bytes); }
     private function performanceStats($cache) {
         $cores = 1;
         if (is_readable('/proc/cpuinfo')) {
@@ -223,7 +223,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         $loads = function_exists('sys_getloadavg') ? sys_getloadavg() : array(0, 0, 0);
         $load = isset($loads[0]) ? (float)$loads[0] : 0;
         $cpu_percent = min(100, round(($load / $cores) * 100, 1));
-        $stats = json_decode((string)@file_get_contents(DIR_CACHE . 'websky_lightning_stats.json'), true);
+        $stats = json_decode((string)@file_get_contents($this->pageCacheDir() . 'stats.json'), true);
         $hits = is_array($stats) && isset($stats['hit']) ? (int)$stats['hit'] : 0;
         $misses = is_array($stats) && isset($stats['miss']) ? (int)$stats['miss'] : 0;
         $total = $hits + $misses;
@@ -233,6 +233,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
     private function improvement($before, $after) { return !empty($before['avg']) && isset($after['avg']) ? round((($before['avg'] - $after['avg']) / $before['avg']) * 100, 1) : null; }
     private function formatBytes($bytes) { if ($bytes >= 1073741824) return round($bytes / 1073741824, 2) . ' GB'; if ($bytes >= 1048576) return round($bytes / 1048576, 2) . ' MB'; if ($bytes >= 1024) return round($bytes / 1024, 2) . ' KB'; return $bytes . ' B'; }
     private function toBytes($value) { $value = trim($value); $unit = strtolower(substr($value, -1)); $number = (int)$value; if ($unit === 'g') return $number * 1073741824; if ($unit === 'm') return $number * 1048576; if ($unit === 'k') return $number * 1024; return $number; }
+    private function pageCacheDir() { require_once(DIR_SYSTEM . 'library/websky_lightning.php'); return WebskyLightning::cacheDirectory(); }
     protected function validate() { if (!$this->user->hasPermission('modify', 'extension/module/websky_lightning')) { $this->error['warning'] = $this->language->get('error_permission'); } return !$this->error; }
     public function install() { $this->load->model('user/user_group'); $this->model_user_user_group->addPermission($this->user->getGroupId(), 'access', 'extension/module/websky_lightning'); $this->model_user_user_group->addPermission($this->user->getGroupId(), 'modify', 'extension/module/websky_lightning'); $this->load->model('setting/setting'); $this->model_setting_setting->editSetting('module_websky_lightning', array('module_websky_lightning_status'=>1,'module_websky_lightning_page_cache'=>0,'module_websky_lightning_query_cache'=>0,'module_websky_lightning_webp'=>0)); }
 }
