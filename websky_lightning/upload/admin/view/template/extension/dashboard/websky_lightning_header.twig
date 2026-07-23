@@ -59,7 +59,7 @@ function webskyLightningRefresh() {
     $('.wl-gauge.hit').closest('.wl-gauge-card').find('p').text('HIT: ' + json.hits + ' · MISS: ' + json.misses);
     $('.wl-gauge.pages').css('--angle', webskyLightningAngle(json.pages)).find('strong').text(json.pages);
     $('.wl-gauge.pages').closest('.wl-gauge-card').find('p').text(json.size);
-    webskyLightningShowSpeed(json.speed_before, json.speed_after, json.speed_improvement);
+    webskyLightningShowSpeedDetails(json.speed_before, json.speed_after, json.speed_improvement, json.speed_before_ttfb, json.speed_after_ttfb, json.speed_before_cache, json.speed_after_cache);
   }).always(function() {
     webskyLightningRefreshRequest = null;
   });
@@ -68,6 +68,18 @@ function webskyLightningShowSpeed(before, after, improvement) {
   $('.wlh-speed-before').text(before === null || typeof before === 'undefined' ? '—' : before);
   $('.wlh-speed-after').text(after === null || typeof after === 'undefined' ? '—' : after);
   $('.wlh-speed-gain').text(improvement === null || typeof improvement === 'undefined' ? '—' : improvement + '%');
+}
+function webskyLightningShowSpeedDetails(before, after, improvement, beforeTtfb, afterTtfb, beforeCache, afterCache) {
+  webskyLightningShowSpeed(before, after, improvement);
+  $('.wlh-speed-values>div:first span').text('\u0632\u0645\u0627\u0646 \u06a9\u0644 \u0633\u0631\u0648\u0631 \u0628\u062f\u0648\u0646 \u06a9\u0634');
+  $('.wlh-speed-values>div:last span').text('\u0632\u0645\u0627\u0646 \u06a9\u0644 \u0633\u0631\u0648\u0631 \u0628\u0627 \u06a9\u0634');
+  var beforeHit = beforeCache && beforeCache.HIT ? beforeCache.HIT : 0;
+  var beforeMiss = beforeCache && beforeCache.MISS ? beforeCache.MISS : 0;
+  var afterHit = afterCache && afterCache.HIT ? afterCache.HIT : 0;
+  var afterMiss = afterCache && afterCache.MISS ? afterCache.MISS : 0;
+  if (beforeTtfb !== null && typeof beforeTtfb !== 'undefined') {
+    $('.wlh-speed-note').attr('dir', 'rtl').text('\u0645\u06cc\u0627\u0646\u0647 TTFB: \u0628\u062f\u0648\u0646 \u06a9\u0634 ' + beforeTtfb + ' ms (' + beforeHit + ' HIT / ' + beforeMiss + ' MISS) \u060c \u0628\u0627 \u06a9\u0634 ' + afterTtfb + ' ms (' + afterHit + ' HIT / ' + afterMiss + ' MISS). \u0627\u06cc\u0646 \u0627\u0639\u062f\u0627\u062f \u0641\u0642\u0637 HTML \u0633\u0645\u062a \u0633\u0631\u0648\u0631\u0646\u062f\u060c \u0646\u0647 \u0644\u0648\u062f \u06a9\u0627\u0645\u0644 \u0645\u0631\u0648\u0631\u06af\u0631.');
+  }
 }
 function webskyLightningStartRefresh() {
   webskyLightningStopRefresh(true);
@@ -92,7 +104,7 @@ $(document).on('click', '.wlh-speed-test', function(e) {
   $('.wlh-speed-note').text('در حال اجرای ۱۰ درخواست آزمایشی؛ لطفاً صبر کنید...');
   $.post(webskyLightningUrl('headerSpeedTest'), {}, function(json) {
     if (json && json.success) {
-      webskyLightningShowSpeed(json.before, json.after, json.improvement);
+      webskyLightningShowSpeedDetails(json.before, json.after, json.improvement, json.before_ttfb, json.after_ttfb, json.before_cache, json.after_cache);
       $('.wlh-speed-note').text(json.status === 200 ? 'میانگین ۵ بار آزمایش برای هر حالت' : 'پاسخ فروشگاه با خطا دریافت شد');
     } else {
       $('.wlh-speed-note').text((json && json.error) || 'اجرای آزمایش ناموفق بود');

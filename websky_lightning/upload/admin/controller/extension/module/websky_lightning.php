@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.7.6';
+    private $version = '1.7.7';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
 
@@ -209,6 +209,10 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
                 'db_files' => $db_stats['files'],
                 'speed_before' => isset($baseline['avg']) ? (int)$baseline['avg'] : null,
                 'speed_after' => isset($after['avg']) ? (int)$after['avg'] : null,
+                'speed_before_ttfb' => isset($baseline['ttfb_median']) ? (int)$baseline['ttfb_median'] : null,
+                'speed_after_ttfb' => isset($after['ttfb_median']) ? (int)$after['ttfb_median'] : null,
+                'speed_before_cache' => isset($baseline['cache']) ? $baseline['cache'] : array(),
+                'speed_after_cache' => isset($after['cache']) ? $after['cache'] : array(),
                 'speed_improvement' => $this->improvement($baseline, $after)
             );
         }
@@ -238,6 +242,10 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
                 'success' => true,
                 'before' => (int)$baseline['avg'],
                 'after' => (int)$after['avg'],
+                'before_ttfb' => (int)$baseline['ttfb_median'],
+                'after_ttfb' => (int)$after['ttfb_median'],
+                'before_cache' => $baseline['cache'],
+                'after_cache' => $after['cache'],
                 'improvement' => $this->improvement($baseline, $after),
                 'status' => (int)$after['status']
             );
