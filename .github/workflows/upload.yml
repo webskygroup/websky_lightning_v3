@@ -1,0 +1,57 @@
+name: Build and upload OpenCart v3 package
+
+on:
+  push:
+    branches:
+      - v3
+    paths:
+      - 'websky_lightning/**'
+      - '.github/workflows/upload.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check FTP credentials
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$FTP_SERVER" || -z "$FTP_USERNAME" || -z "$FTP_PASSWORD" ]]; then
+            echo "::error::FTP_SERVER, FTP_USERNAME, and FTP_PASSWORD secrets must be configured."
+            exit 1
+          fi
+
+      - name: Build and verify OCMOD package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f websky_lightning/install.xml
+          test -d websky_lightning/upload
+          mkdir -p dist
+          (
+            cd websky_lightning
+            zip -qr ../dist/websky_lightning.ocmod.zip install.xml upload
+          )
+          unzip -t dist/websky_lightning.ocmod.zip
+
+      - name: Upload package to opencart-ir.com
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          protocol: ftp
+          local-dir: dist/
+          server-dir: /public_html/dl/v3/
