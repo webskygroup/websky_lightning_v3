@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.7.1';
+    private $version = '1.7.2';
 
     public function index() {
         $this->load->language('extension/module/websky_lightning');
@@ -269,12 +269,37 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         }
         $loads = function_exists('sys_getloadavg') ? sys_getloadavg() : array(0, 0, 0);
         $load = isset($loads[0]) ? (float)$loads[0] : 0;
-        $cpu_percent = min(100, round(($load / $cores) * 100, 1));
+        $cpu_percent = $this->cpuPercent(min(100, round(($load / $cores) * 100, 1)));
         $stats = json_decode((string)@file_get_contents($this->pageCacheDir() . 'stats.json'), true);
         $hits = is_array($stats) && isset($stats['hit']) ? (int)$stats['hit'] : 0;
         $misses = is_array($stats) && isset($stats['miss']) ? (int)$stats['miss'] : 0;
         $total = $hits + $misses;
         return array('cpu_percent' => $cpu_percent, 'cpu_load' => round($load, 2), 'cpu_cores' => $cores, 'hits' => $hits, 'misses' => $misses, 'hit_rate' => $total ? round(($hits / $total) * 100, 1) : 0);
+    }
+    private function cpuPercent($fallback) {
+        // Measure two /proc/stat snapshots during this request. This keeps the
+        // value live even when the admin session is not persisted between AJAX
+        // requests (and avoids relying on the much slower 1-minute load average).
+        $before = $this->cpuSample();
+        if (!$before) { return $fallback; }
+        if (function_exists('usleep')) { @usleep(100000); }
+        $after = $this->cpuSample();
+        if (!$after) { return $fallback; }
+        $total_delta = $after['total'] - (float)$before['total'];
+        $idle_delta = $after['idle'] - (float)$before['idle'];
+        if ($total_delta <= 0 || $idle_delta < 0) { return $fallback; }
+        return round(max(0, min(100, (($total_delta - $idle_delta) / $total_delta) * 100)), 1);
+    }
+    private function cpuSample() {
+        if (!is_readable('/proc/stat')) { return array(); }
+        $stat = @file_get_contents('/proc/stat');
+        if (!$stat || !preg_match('/^cpu\s+(.+)$/m', $stat, $match)) { return array(); }
+        $values = preg_split('/\s+/', trim($match[1]));
+        if (count($values) < 5) { return array(); }
+        $values = array_map('floatval', array_slice($values, 0, 8));
+        $total = array_sum($values);
+        $idle = (isset($values[3]) ? $values[3] : 0) + (isset($values[4]) ? $values[4] : 0);
+        return array('total' => $total, 'idle' => $idle);
     }
     private function decodeReport($value) { $data = json_decode((string)$value, true); return is_array($data) ? $data : array(); }
     private function improvement($before, $after) { return !empty($before['avg']) && isset($after['avg']) ? round((($before['avg'] - $after['avg']) / $before['avg']) * 100, 1) : null; }
