@@ -2,6 +2,8 @@
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
     private $version = '1.7.3';
+    private $version_extension = 'websky_lightning_v3';
+    private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip';
 
     public function index() {
         $this->load->language('extension/module/websky_lightning');
@@ -237,23 +239,30 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         $cache_file = DIR_CACHE . 'websky_lightning_update.json';
         if (!$refresh && is_file($cache_file) && filemtime($cache_file) > time() - 21600) {
             $cached = json_decode((string)@file_get_contents($cache_file), true);
-            if (is_array($cached) && !empty($cached['version']) && version_compare($cached['version'], $this->version, '>=')) { return $cached; }
+            if (is_array($cached) && !empty($cached['version']) && version_compare($cached['version'], $this->version, '>=')) {
+                // Keep older cache entries from sending administrators to GitHub.
+                $cached['download'] = $this->download_url;
+                return $cached;
+            }
         }
         if ($refresh) { @unlink($cache_file); }
-        $result = array('version' => $this->version, 'date' => '', 'body' => '', 'download' => 'https://github.com/webskygroup/websky_lightning_v3/releases', 'connected' => false);
+        $result = array('version' => $this->version, 'date' => '', 'body' => '', 'download' => $this->download_url, 'connected' => false);
         if (function_exists('curl_init')) {
-            $ch = curl_init('https://api.github.com/repos/webskygroup/websky_lightning_v3/releases/latest' . ($refresh ? '?refresh=' . time() : ''));
-            curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 5, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => 'Websky-Lightning/' . $this->version));
+            $ch = curl_init('https://opencart-ir.com/version/index.php?route=extension/websky_lastversion/module/websky_lastversion');
+            curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 6, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_POST => true, CURLOPT_POSTFIELDS => array('extension_name' => $this->version_extension), CURLOPT_USERAGENT => 'Websky-Lightning/' . $this->version));
             $json = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
             $release = json_decode((string)$json, true);
-            if ($code === 200 && is_array($release)) {
+            if ($code === 200 && is_array($release) && !empty($release['version_ext'])) {
                 $result['connected'] = true;
-                $source = (isset($release['tag_name']) ? $release['tag_name'] : '') . ' ' . (isset($release['name']) ? $release['name'] : '');
-                if (preg_match('/\d+\.\d+\.\d+/', $source, $match)) { $result['version'] = $match[0]; }
-                $result['date'] = isset($release['published_at']) ? substr($release['published_at'], 0, 10) : '';
-                $result['body'] = isset($release['body']) ? $release['body'] : '';
-                if (!empty($release['assets'][0]['browser_download_url'])) { $result['download'] = $release['assets'][0]['browser_download_url']; }
-                elseif (!empty($release['html_url'])) { $result['download'] = $release['html_url']; }
+                $result['version'] = (string)$release['version_ext'];
+                $date = !empty($release['date_released']) ? $release['date_released'] : (isset($release['date_added']) ? $release['date_added'] : '');
+                $result['date'] = $date ? substr($date, 0, 10) : '';
+                foreach (array('release_notes', 'description', 'log', 'change_log', 'changes') as $key) {
+                    if (!empty($release[$key])) {
+                        $result['body'] = is_array($release[$key]) ? implode("\n", $release[$key]) : (string)$release[$key];
+                        break;
+                    }
+                }
             }
         }
         @file_put_contents($cache_file, json_encode($result), LOCK_EX);
