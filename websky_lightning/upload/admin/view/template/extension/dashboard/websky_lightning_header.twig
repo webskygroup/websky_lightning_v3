@@ -4,7 +4,7 @@
     <span class="wlh-badge">—</span>
   </a>
   <ul class="dropdown-menu dropdown-menu-right wlh-menu">
-    <li class="wlh-head"><span class="wlh-mark"><i class="fa fa-bolt"></i></span><div><strong>وب‌اسکای لایتنینگ</strong><small>مانیتور زنده عملکرد و کش</small></div></li>
+    <li class="wlh-head"><span class="wlh-mark"><i class="fa fa-bolt"></i></span><div><strong>لایتنینگ</strong><small>مانیتور زنده عملکرد و کش</small></div></li>
     <li class="wlh-stats">
       <div class="wlh-stat"><span class="wlh-ring wlh-cpu" style="--angle:0deg"><b>—</b></span><div><strong>پردازنده</strong><small class="wlh-cpu-detail">در حال دریافت...</small></div></div>
       <div class="wlh-stat"><span class="wlh-ring wlh-hit" style="--angle:0deg"><b>—</b></span><div><strong>نرخ اصابت کش</strong><small class="wlh-hit-detail">در حال دریافت...</small></div></div>
@@ -26,6 +26,7 @@
 <style>
 .wlh-speed-stat{padding:13px 0 7px;border-top:1px solid #eef2f7}.wlh-speed-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.wlh-speed-title strong{font-size:13px}.wlh-speed-test{border:0;border-radius:6px;background:#eff6ff;color:#2563eb;padding:4px 8px;font-size:11px}.wlh-speed-values{direction:rtl;display:flex;align-items:center;gap:7px}.wlh-speed-values>div{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:7px;text-align:center}.wlh-speed-values span{display:block;color:#64748b;font-size:10px}.wlh-speed-values b{direction:ltr;display:inline-block;font-size:18px;margin-top:2px}.wlh-speed-values small{font-size:9px;color:#94a3b8}.wlh-speed-values>i{color:#94a3b8}.wlh-speed-gain{direction:ltr;background:#dcfce7;color:#15803d;border-radius:12px;padding:4px 6px;font-size:10px;font-style:normal;font-weight:700}.wlh-speed-note{display:block;margin-top:7px;color:#94a3b8;font-size:10px}.wlh-menu{width:360px}.wlh-stats{max-height:440px}@media(max-width:480px){.wlh-menu{width:310px}}
 </style>
+<style>.wlh-mark{background:#fbbf24 url('https://opencart-ir.com/image/logo25.png') center/contain no-repeat}.wlh-mark i{display:none}</style>
 <script>
 function webskyLightningToken() { var match = window.location.href.match(/[?&]user_token=([^&#]+)/); return match ? decodeURIComponent(match[1]) : ''; }
 function webskyLightningUrl(method) { return 'index.php?route=extension/module/websky_lightning/' + method + '&user_token=' + encodeURIComponent(webskyLightningToken()); }
