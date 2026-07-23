@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.7.5';
+    private $version = '1.7.6';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
 
@@ -30,7 +30,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
             'text_cache_size','text_webp_support','text_db_driver','text_version','text_on','text_off','text_help',
             'text_report','text_environment','text_benchmark','text_before','text_after','text_no_data','text_recommendations',
             'text_php_version','text_memory_limit','text_opcache','text_gzip','text_database_size','text_database_overhead',
-            'text_server','text_avg','text_min','text_max','text_http','text_response_size','text_improvement',
+            'text_server','text_avg','text_median','text_p95','text_ttfb','text_min','text_max','text_http','text_response_size','text_improvement',
             'text_update','text_current_version','text_latest_version','text_release_date','text_changelog','text_update_status',
             'text_up_to_date','text_update_available','text_update_unavailable','button_download_update','button_check_update',
             'text_cpu_load','text_cache_hit_rate','text_cached_pages_graph','text_live_overview','text_hits','text_misses',
@@ -247,27 +247,45 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
     }
 
     private function runBenchmark($bypass = false) {
-        $runs = array(); $status = 0; $bytes = 0;
+        $runs = array(); $ttfb = array(); $status = 0; $bytes = 0; $cache = array();
         for ($i = 0; $i < 5; $i++) {
             $result = $this->benchmarkRequest($bypass);
-            $runs[] = $result['time']; $status = $result['status']; $bytes = $result['bytes'];
+            $runs[] = $result['time']; $ttfb[] = $result['ttfb']; $status = $result['status']; $bytes = $result['bytes']; $cache[] = $result['cache'];
         }
-        return array('time' => date('c'), 'runs' => $runs, 'avg' => round(array_sum($runs) / count($runs)), 'min' => min($runs), 'max' => max($runs), 'status' => $status, 'bytes' => $bytes);
+        sort($runs); sort($ttfb);
+        return array('time' => date('c'), 'runs' => $runs, 'ttfb_runs' => $ttfb,
+            'avg' => $this->percentile($runs, 50), 'mean' => round(array_sum($runs) / count($runs)), 'median' => $this->percentile($runs, 50), 'p95' => $this->percentile($runs, 95),
+            'ttfb_avg' => round(array_sum($ttfb) / count($ttfb)), 'ttfb_median' => $this->percentile($ttfb, 50),
+            'min' => min($runs), 'max' => max($runs), 'status' => $status, 'bytes' => $bytes, 'cache' => array_count_values($cache));
+    }
+
+    private function percentile($values, $percentile) {
+        if (!$values) return 0;
+        $index = (count($values) - 1) * ($percentile / 100);
+        $lower = (int)floor($index); $upper = (int)ceil($index);
+        if ($lower === $upper) return (int)$values[$lower];
+        return (int)round($values[$lower] + (($values[$upper] - $values[$lower]) * ($index - $lower)));
     }
 
     private function benchmarkRequest($bypass = false) {
         $url = defined('HTTPS_CATALOG') ? HTTPS_CATALOG : HTTP_CATALOG;
         $test_url = $bypass ? $url . (strpos($url, '?') === false ? '?websky_bypass=1&websky_benchmark=' : '&websky_bypass=1&websky_benchmark=') . mt_rand() : $url;
         $start = microtime(true); $body = ''; $status = 0;
+        $ttfb = 0; $cache = 'UNKNOWN';
         if (function_exists('curl_init')) {
             $ch = curl_init($test_url);
-            curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 30, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => 'Websky-Lightning/' . $this->version));
-            $body = (string)curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+            curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 30, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => 'Websky-Lightning/' . $this->version));
+            $body = (string)curl_exec($ch); $info = curl_getinfo($ch); $status = (int)$info['http_code'];
+            $ttfb = (int)round(((float)$info['starttransfer_time']) * 1000);
+            $header_size = isset($info['header_size']) ? (int)$info['header_size'] : 0;
+            $headers = substr($body, 0, $header_size); $body = substr($body, $header_size);
+            if (preg_match('/^X-Websky-Cache:\s*(HIT|MISS)/mi', $headers, $match)) $cache = strtoupper($match[1]);
+            curl_close($ch);
         } else {
             $context = stream_context_create(array('http' => array('timeout' => 30, 'header' => "User-Agent: Websky-Lightning\r\n"), 'ssl' => array('verify_peer' => false, 'verify_peer_name' => false)));
             $body = (string)@file_get_contents($test_url, false, $context); $status = $body !== '' ? 200 : 0;
         }
-        return array('time' => round((microtime(true) - $start) * 1000), 'status' => $status, 'bytes' => strlen($body));
+        return array('time' => round((microtime(true) - $start) * 1000), 'ttfb' => $ttfb, 'cache' => $cache, 'status' => $status, 'bytes' => strlen($body));
     }
 
     private function diagnostics() {
