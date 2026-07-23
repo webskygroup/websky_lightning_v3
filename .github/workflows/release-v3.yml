@@ -50,3 +50,30 @@ jobs:
           else
             gh release create "$TAG" "$asset" --target v3 --title "Websky Lightning v${VERSION}" --notes "Automated OpenCart 3 release for Websky Lightning v${VERSION}."
           fi
+
+      - name: Check Version API token
+        id: version_api_credentials
+        env:
+          VERSION_API_TOKEN: ${{ secrets.VERSION_API_TOKEN }}
+        run: |
+          if [[ -n "$VERSION_API_TOKEN" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::VERSION_API_TOKEN secret is not configured; version API notification was skipped."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Version API
+        if: steps.version_api_credentials.outputs.configured == 'true'
+        env:
+          VERSION_API_TOKEN: ${{ secrets.VERSION_API_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          curl --fail-with-body -G "https://opencart-ir.com/version/index.php" \
+            --data-urlencode "route=tool/websky_version" \
+            --data-urlencode "token=${VERSION_API_TOKEN}" \
+            --data-urlencode "module=websky_lightning_v3" \
+            --data-urlencode "version=${VERSION}" \
+            --data-urlencode "released_at=$(git log -1 --format=%cI)" \
+            --data-urlencode "description=$(git log -1 --format=%s)"
