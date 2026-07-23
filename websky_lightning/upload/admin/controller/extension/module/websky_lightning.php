@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.7.0';
+    private $version = '1.7.1';
 
     public function index() {
         $this->load->language('extension/module/websky_lightning');
@@ -237,11 +237,12 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         $cache_file = DIR_CACHE . 'websky_lightning_update.json';
         if (!$refresh && is_file($cache_file) && filemtime($cache_file) > time() - 21600) {
             $cached = json_decode((string)@file_get_contents($cache_file), true);
-            if (is_array($cached)) { return $cached; }
+            if (is_array($cached) && !empty($cached['version']) && version_compare($cached['version'], $this->version, '>=')) { return $cached; }
         }
+        if ($refresh) { @unlink($cache_file); }
         $result = array('version' => $this->version, 'date' => '', 'body' => '', 'download' => 'https://github.com/webskygroup/websky_lightning_v3/releases', 'connected' => false);
         if (function_exists('curl_init')) {
-            $ch = curl_init('https://api.github.com/repos/webskygroup/websky_lightning_v3/releases/latest');
+            $ch = curl_init('https://api.github.com/repos/webskygroup/websky_lightning_v3/releases/latest' . ($refresh ? '?refresh=' . time() : ''));
             curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 5, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_USERAGENT => 'Websky-Lightning/' . $this->version));
             $json = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
             $release = json_decode((string)$json, true);
