@@ -1,5 +1,5 @@
 <?php
-$_['heading_title'] = 'Websky Lightning';
+$_['heading_title'] = 'Lightning ⚡';
 $_['text_edit'] = 'Configure Websky Lightning';
 $_['text_success'] = 'Settings saved successfully.';
 $_['entry_status'] = 'Status';
