@@ -41,9 +41,9 @@ jobs:
           mkdir -p dist
           (
             cd websky_lightning
-            zip -qr ../dist/websky_lightning.ocmod.zip install.xml upload
+            zip -qr ../dist/websky_lightning.ocmod.zip883948 install.xml upload
           )
-          unzip -t dist/websky_lightning.ocmod.zip
+          unzip -t dist/websky_lightning.ocmod.zip883948
 
       - name: Upload package to opencart-ir.com
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
