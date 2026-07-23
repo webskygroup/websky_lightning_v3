@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.7.4';
+    private $version = '1.7.5';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
 
@@ -43,6 +43,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         $data['benchmark_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning/speedTest', 'user_token=' . $this->session->data['user_token'], true), ENT_QUOTES, 'UTF-8');
         $data['clear_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning/clearCache', 'user_token=' . $this->session->data['user_token'], true), ENT_QUOTES, 'UTF-8');
         $data['update_check_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning', 'user_token=' . $this->session->data['user_token'] . '&refresh_update=1#tab-update', true), ENT_QUOTES, 'UTF-8');
+        $data['upgrade_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning/upgrade', 'user_token=' . $this->session->data['user_token'], true), ENT_QUOTES, 'UTF-8');
 
         $defaults = array('status' => 1, 'page_cache' => 0, 'query_cache' => 0, 'webp' => 0);
         foreach ($defaults as $key => $default) {
@@ -85,6 +86,67 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         $data['column_left'] = $this->load->controller('common/column_left');
         $data['footer'] = $this->load->controller('common/footer');
         $this->response->setOutput($this->load->view('extension/module/websky_lightning', $data));
+    }
+
+    public function upgrade() {
+        $this->load->language('extension/module/websky_lightning');
+
+        $json = array();
+        $temporary_directory = '';
+        $zip_file = '';
+
+        if (!$this->user->hasPermission('modify', 'extension/module/websky_lightning')) {
+            $json['error'] = $this->language->get('error_permission');
+        }
+        if (!$json && !class_exists('ZipArchive')) {
+            $json['error'] = 'ZipArchive is not available on the server.';
+        }
+        if (!$json) {
+            $package = $this->downloadPackage();
+            if (!$package) {
+                $json['error'] = 'The update package could not be downloaded or is invalid.';
+            }
+        }
+        if (!$json) {
+            $token = function_exists('token') ? token(12) : substr(sha1(uniqid('', true)), 0, 12);
+            $temporary_directory = rtrim(DIR_UPLOAD, '/\\') . '/websky-lightning-' . $token;
+            $zip_file = $temporary_directory . '.ocmod.zip';
+            if (@file_put_contents($zip_file, $package) === false) {
+                $json['error'] = 'The update package could not be saved.';
+            }
+        }
+        if (!$json) {
+            $zip = new ZipArchive();
+            $zip_opened = $zip->open($zip_file) === true;
+            if (!$zip_opened || !$this->validateArchive($zip)) {
+                $json['error'] = 'The update package failed validation.';
+            } elseif (!is_dir($temporary_directory) && !@mkdir($temporary_directory, 0755, true)) {
+                $json['error'] = 'The temporary update directory could not be created.';
+            } elseif (!$zip->extractTo($temporary_directory)) {
+                $json['error'] = 'The update package could not be extracted.';
+            }
+            if ($zip_opened) {
+                $zip->close();
+            }
+        }
+        if (!$json && !$this->copyUpgradeFiles($temporary_directory . '/upload')) {
+            $json['error'] = 'The module files could not be installed.';
+        }
+        if (!$json && !$this->refreshModification($temporary_directory . '/install.xml')) {
+            $json['error'] = 'The modification definition could not be refreshed.';
+        }
+        if ($zip_file && is_file($zip_file)) {
+            @unlink($zip_file);
+        }
+        if ($temporary_directory && is_dir($temporary_directory)) {
+            $this->removeDirectory($temporary_directory);
+        }
+        if (!$json) {
+            @unlink(DIR_CACHE . 'websky_lightning_update.json');
+            $json['success'] = $this->language->get('text_upgrade_success');
+        }
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
     }
 
     public function speedTest() {
@@ -267,6 +329,147 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         }
         @file_put_contents($cache_file, json_encode($result), LOCK_EX);
         return $result;
+    }
+
+    private function downloadPackage() {
+        $package = $this->requestRemote($this->download_url, array(), 60, false);
+        if (!$package || strlen($package) > 52428800 || substr($package, 0, 2) !== 'PK') {
+            return '';
+        }
+        return $package;
+    }
+
+    private function requestRemote($url, $fields, $timeout, $post = true) {
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, array(
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 3,
+                CURLOPT_CONNECTTIMEOUT => min(5, $timeout),
+                CURLOPT_TIMEOUT => $timeout,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_USERAGENT => 'OpenCart Websky Lightning/' . $this->version
+            ));
+            if ($post) {
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $fields);
+            }
+            $response = curl_exec($ch);
+            $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            return ($response !== false && $status >= 200 && $status < 300) ? $response : '';
+        }
+
+        $options = array('http' => array(
+            'method' => $post ? 'POST' : 'GET',
+            'timeout' => $timeout,
+            'ignore_errors' => true,
+            'header' => "User-Agent: OpenCart Websky Lightning/" . $this->version . "\r\n"
+        ));
+        if ($post) {
+            $options['http']['header'] .= "Content-Type: application/x-www-form-urlencoded\r\n";
+            $options['http']['content'] = http_build_query($fields);
+        }
+        $response = @file_get_contents($url, false, stream_context_create($options));
+        return $response === false ? '' : $response;
+    }
+
+    private function validateArchive($zip) {
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = str_replace('\\', '/', $zip->getNameIndex($index));
+            if (!$name || strpos($name, "\0") !== false || preg_match('#(^/|^[A-Za-z]:|(?:^|/)\.\.(?:/|$))#', $name)) {
+                return false;
+            }
+            if ($name !== 'install.xml' && strpos($name, 'upload/') !== 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private function copyUpgradeFiles($upload_directory) {
+        if (!is_dir($upload_directory)) {
+            return false;
+        }
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($upload_directory, FilesystemIterator::SKIP_DOTS));
+        $copied = 0;
+        foreach ($iterator as $file) {
+            if (!$file->isFile() || $file->isLink()) {
+                continue;
+            }
+            $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($upload_directory) + 1));
+            if (!preg_match('#^(admin|catalog|system)/#', $relative) || strpos($relative, "\0") !== false || preg_match('#(^|/)\.\.(?:/|$)#', $relative)) {
+                return false;
+            }
+            if (strpos($relative, 'admin/') === 0) {
+                $destination = rtrim(DIR_APPLICATION, '/\\') . '/' . substr($relative, 6);
+            } elseif (strpos($relative, 'catalog/') === 0) {
+                $destination = rtrim(DIR_CATALOG, '/\\') . '/' . substr($relative, 8);
+            } else {
+                $destination = rtrim(DIR_SYSTEM, '/\\') . '/' . substr($relative, 7);
+            }
+            $destination_directory = dirname($destination);
+            if (!is_dir($destination_directory) && !@mkdir($destination_directory, 0755, true)) {
+                return false;
+            }
+            if (!@copy($file->getPathname(), $destination)) {
+                return false;
+            }
+            $copied++;
+        }
+        return $copied > 0;
+    }
+
+    private function refreshModification($xml_file) {
+        if (!is_file($xml_file)) {
+            return false;
+        }
+        $xml = @file_get_contents($xml_file);
+        if (!$xml) {
+            return false;
+        }
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        if (!@$dom->loadXML($xml)) {
+            return false;
+        }
+        $get = function($tag) use ($dom) {
+            $node = $dom->getElementsByTagName($tag)->item(0);
+            return $node ? trim($node->nodeValue) : '';
+        };
+        $code = $get('code');
+        if ($code === '') {
+            return false;
+        }
+        $this->load->model('setting/modification');
+        $existing = $this->model_setting_modification->getModificationByCode($code);
+        if ($existing) {
+            $this->model_setting_modification->deleteModification($existing['modification_id']);
+        }
+        $this->model_setting_modification->addModification(array(
+            'extension_install_id' => 0,
+            'name' => $get('name'),
+            'code' => $code,
+            'author' => $get('author'),
+            'version' => $get('version'),
+            'link' => $get('link'),
+            'xml' => $xml,
+            'status' => 1
+        ));
+        return true;
+    }
+
+    private function removeDirectory($directory) {
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($iterator as $item) {
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+            } else {
+                @unlink($item->getPathname());
+            }
+        }
+        @rmdir($directory);
     }
 
     private function cacheStats() { $files = glob($this->pageCacheDir() . '*.html') ?: array(); $bytes = 0; foreach ($files as $file) { if (is_file($file)) { $bytes += filesize($file); } } return array('files' => count($files), 'bytes' => $bytes); }
