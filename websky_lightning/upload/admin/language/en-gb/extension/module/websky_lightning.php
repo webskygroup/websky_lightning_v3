@@ -4,6 +4,7 @@ $_['text_edit'] = 'Configure Websky Lightning';
 $_['text_success'] = 'Settings saved successfully.';
 $_['entry_status'] = 'Status';
 $_['entry_page_cache'] = 'Full page cache'; $_['entry_query_cache'] = 'Database query cache'; $_['entry_webp'] = 'Generate WebP images';
+$_['entry_cache_scope'] = 'Page cache coverage'; $_['text_scope_core'] = 'Homepage, products and categories'; $_['text_scope_all'] = 'All public pages'; $_['help_cache_scope'] = 'Private pages such as account, cart, checkout and API routes are always excluded.';
 $_['button_save'] = 'Save';
 $_['button_cancel'] = 'Cancel';
 $_['error_permission'] = 'Warning: You do not have permission to modify Websky Lightning.';

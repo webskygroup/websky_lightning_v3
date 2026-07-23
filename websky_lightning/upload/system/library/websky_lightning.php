@@ -166,13 +166,43 @@ class WebskyLightning {
     private static function eligible($registry) {
         $request = $registry->get('request');
         $session = $registry->get('session');
+        $config = $registry->get('config');
         if (!$request || !isset($request->server['REQUEST_METHOD']) || strtoupper($request->server['REQUEST_METHOD']) !== 'GET') { return false; }
         if (isset($request->get['websky_bypass'])) { return false; }
         if (!empty($request->server['HTTP_X_REQUESTED_WITH'])) { return false; }
         if ($session && (!empty($session->data['customer_id']) || !empty($session->data['customer']) || !empty($session->data['cart']) || !empty($session->data['guest']))) { return false; }
-        $route = isset($request->get['route']) ? $request->get['route'] : 'common/home';
-        $allowed = array('common/home', 'product/product', 'product/category', 'product/manufacturer/info', 'information/information');
-        return in_array($route, $allowed, true);
+        $route = self::detectedRoute($registry);
+        $scope = $config ? $config->get('module_websky_lightning_cache_scope') : 'core';
+        if ($scope === 'all') {
+            return !preg_match('#^(account/|checkout/|api/|sale/|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
+        }
+        return in_array($route, array('common/home', 'product/product', 'product/category'), true);
+    }
+
+    private static function detectedRoute($registry) {
+        $request = $registry->get('request');
+        if (isset($request->get['route']) && $request->get['route'] !== '') { return (string)$request->get['route']; }
+        $uri = isset($request->server['REQUEST_URI']) ? (string)$request->server['REQUEST_URI'] : '/';
+        $path = trim((string)parse_url($uri, PHP_URL_PATH), '/');
+        if ($path === '' || $path === 'index.php') { return 'common/home'; }
+        if (preg_match('#(?:^|/)product/#i', $path)) { return 'product/product'; }
+        if (preg_match('#(?:^|/)category/#i', $path)) { return 'product/category'; }
+        $segments = explode('/', $path);
+        $keyword = rawurldecode((string)end($segments));
+        $db = $registry->get('db');
+        if ($db && $keyword !== '') {
+            try {
+                $query = $db->query("SELECT `query` FROM `" . DB_PREFIX . "seo_url` WHERE `keyword` = '" . $db->escape($keyword) . "' ORDER BY `seo_url_id` DESC LIMIT 1");
+                if (!empty($query->row['query'])) {
+                    $value = $query->row['query'];
+                    if (strpos($value, 'product_id=') === 0) { return 'product/product'; }
+                    if (strpos($value, 'category_id=') === 0) { return 'product/category'; }
+                    if (strpos($value, 'manufacturer_id=') === 0) { return 'product/manufacturer/info'; }
+                    if (strpos($value, 'information_id=') === 0) { return 'information/information'; }
+                }
+            } catch (\Exception $e) {}
+        }
+        return 'common/page';
     }
 
     private static function cacheFile($registry) {
@@ -181,8 +211,9 @@ class WebskyLightning {
         $language = $session && isset($session->data['language']) ? $session->data['language'] : $config->get('config_language');
         $currency = $session && isset($session->data['currency']) ? $session->data['currency'] : $config->get('config_currency');
         $acceptsWebp = !empty($request->server['HTTP_ACCEPT']) && strpos($request->server['HTTP_ACCEPT'], 'image/webp') !== false ? 'webp' : 'legacy';
-        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $uri;
-        return self::cacheDirectory() . hash('sha256', $key) . '.html';
+        $scope = $config->get('module_websky_lightning_cache_scope') === 'all' ? 'all' : 'core';
+        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $scope . '|' . $uri;
+        return self::cacheDirectory() . $scope . '_' . hash('sha256', $key) . '.html';
     }
 
     private static function catalogRequest() {

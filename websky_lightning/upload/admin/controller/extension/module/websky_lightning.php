@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.6.0';
+    private $version = '1.7.0';
 
     public function index() {
         $this->load->language('extension/module/websky_lightning');
@@ -32,7 +32,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
             'text_update','text_current_version','text_latest_version','text_release_date','text_changelog','text_update_status',
             'text_up_to_date','text_update_available','text_update_unavailable','button_download_update','button_check_update',
             'text_cpu_load','text_cache_hit_rate','text_cached_pages_graph','text_live_overview','text_hits','text_misses',
-            'entry_status','entry_page_cache','entry_query_cache','entry_webp','button_save','button_cancel',
+            'entry_status','entry_page_cache','entry_query_cache','entry_webp','entry_cache_scope','text_scope_core','text_scope_all','help_cache_scope','button_save','button_cancel',
             'button_test_before','button_test_after','button_clear_cache','button_refresh','error_permission'
         ) as $key) { $data[$key] = $this->language->get($key); }
 
@@ -50,6 +50,8 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
             if ($value === null) { $value = $this->config->get($old); }
             $data[$name] = $value === null ? $default : $value;
         }
+        $data['module_websky_lightning_cache_scope'] = isset($this->request->post['module_websky_lightning_cache_scope']) ? $this->request->post['module_websky_lightning_cache_scope'] : $this->config->get('module_websky_lightning_cache_scope');
+        if (!in_array($data['module_websky_lightning_cache_scope'], array('core', 'all'), true)) { $data['module_websky_lightning_cache_scope'] = 'core'; }
 
         $cache = $this->cacheStats();
         $data['cache_file_count'] = $cache['files'];
@@ -125,6 +127,8 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
             $cache = $this->cacheStats();
             $stats = $this->performanceStats($cache);
             $db_stats = $this->databaseCacheStats();
+            $baseline = $this->decodeReport($this->config->get('module_websky_lightning_baseline'));
+            $after = $this->decodeReport($this->config->get('module_websky_lightning_after'));
             $json = array(
                 'success' => true,
                 'cpu' => $stats['cpu_percent'],
@@ -138,7 +142,40 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
                 'db_hits' => $db_stats['hits'],
                 'db_misses' => $db_stats['misses'],
                 'db_rate' => $db_stats['rate'],
-                'db_files' => $db_stats['files']
+                'db_files' => $db_stats['files'],
+                'speed_before' => isset($baseline['avg']) ? (int)$baseline['avg'] : null,
+                'speed_after' => isset($after['avg']) ? (int)$after['avg'] : null,
+                'speed_improvement' => $this->improvement($baseline, $after)
+            );
+        }
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
+    }
+
+    public function headerSpeedTest() {
+        $this->load->language('extension/module/websky_lightning');
+        $json = array();
+        if (!$this->validate()) {
+            $json['error'] = $this->language->get('error_permission');
+        } else {
+            $baseline = $this->runBenchmark(true);
+
+            // Warm the public homepage once before measuring cache-assisted requests.
+            $this->benchmarkRequest(false);
+            $after = $this->runBenchmark(false);
+
+            $this->load->model('setting/setting');
+            $settings = $this->model_setting_setting->getSetting('module_websky_lightning');
+            $settings['module_websky_lightning_baseline'] = json_encode($baseline);
+            $settings['module_websky_lightning_after'] = json_encode($after);
+            $this->model_setting_setting->editSetting('module_websky_lightning', $settings);
+
+            $json = array(
+                'success' => true,
+                'before' => (int)$baseline['avg'],
+                'after' => (int)$after['avg'],
+                'improvement' => $this->improvement($baseline, $after),
+                'status' => (int)$after['status']
             );
         }
         $this->response->addHeader('Content-Type: application/json');
@@ -146,23 +183,27 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
     }
 
     private function runBenchmark($bypass = false) {
-        $url = defined('HTTPS_CATALOG') ? HTTPS_CATALOG : HTTP_CATALOG;
         $runs = array(); $status = 0; $bytes = 0;
         for ($i = 0; $i < 5; $i++) {
-            $start = microtime(true); $body = '';
-            if (function_exists('curl_init')) {
-                $test_url = $bypass ? $url . (strpos($url, '?') === false ? '?websky_bypass=1&websky_benchmark=' : '&websky_bypass=1&websky_benchmark=') . mt_rand() : $url;
-                $ch = curl_init($test_url);
-                curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 30, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => 'Websky-Lightning/' . $this->version));
-                $body = (string)curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-            } else {
-                $context = stream_context_create(array('http' => array('timeout' => 30, 'header' => "User-Agent: Websky-Lightning\r\n"), 'ssl' => array('verify_peer' => false, 'verify_peer_name' => false)));
-                $test_url = $bypass ? $url . (strpos($url, '?') === false ? '?websky_bypass=1&websky_benchmark=' : '&websky_bypass=1&websky_benchmark=') . mt_rand() : $url;
-                $body = (string)@file_get_contents($test_url, false, $context); $status = $body !== '' ? 200 : 0;
-            }
-            $runs[] = round((microtime(true) - $start) * 1000); $bytes = strlen($body);
+            $result = $this->benchmarkRequest($bypass);
+            $runs[] = $result['time']; $status = $result['status']; $bytes = $result['bytes'];
         }
         return array('time' => date('c'), 'runs' => $runs, 'avg' => round(array_sum($runs) / count($runs)), 'min' => min($runs), 'max' => max($runs), 'status' => $status, 'bytes' => $bytes);
+    }
+
+    private function benchmarkRequest($bypass = false) {
+        $url = defined('HTTPS_CATALOG') ? HTTPS_CATALOG : HTTP_CATALOG;
+        $test_url = $bypass ? $url . (strpos($url, '?') === false ? '?websky_bypass=1&websky_benchmark=' : '&websky_bypass=1&websky_benchmark=') . mt_rand() : $url;
+        $start = microtime(true); $body = ''; $status = 0;
+        if (function_exists('curl_init')) {
+            $ch = curl_init($test_url);
+            curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 30, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => 'Websky-Lightning/' . $this->version));
+            $body = (string)curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        } else {
+            $context = stream_context_create(array('http' => array('timeout' => 30, 'header' => "User-Agent: Websky-Lightning\r\n"), 'ssl' => array('verify_peer' => false, 'verify_peer_name' => false)));
+            $body = (string)@file_get_contents($test_url, false, $context); $status = $body !== '' ? 200 : 0;
+        }
+        return array('time' => round((microtime(true) - $start) * 1000), 'status' => $status, 'bytes' => strlen($body));
     }
 
     private function diagnostics() {
@@ -241,5 +282,5 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
     private function pageCacheDir() { require_once(DIR_SYSTEM . 'library/websky_lightning.php'); return WebskyLightning::cacheDirectory(); }
     private function databaseCacheStats() { $dir = (defined('DIR_STORAGE') ? rtrim(DIR_STORAGE, '/\\') : dirname(rtrim(DIR_CACHE, '/\\'))) . DIRECTORY_SEPARATOR . 'websky_lightning_db_cache' . DIRECTORY_SEPARATOR; $stats = json_decode((string)@file_get_contents($dir . 'stats.json'), true); $hits = is_array($stats) && isset($stats['hit']) ? (int)$stats['hit'] : 0; $misses = is_array($stats) && isset($stats['miss']) ? (int)$stats['miss'] : 0; $total = $hits + $misses; return array('hits'=>$hits,'misses'=>$misses,'rate'=>$total ? round($hits / $total * 100, 1) : 0,'files'=>count(glob($dir . '*.qcache') ?: array())); }
     protected function validate() { if (!$this->user->hasPermission('modify', 'extension/module/websky_lightning')) { $this->error['warning'] = $this->language->get('error_permission'); } return !$this->error; }
-    public function install() { $this->load->model('user/user_group'); $this->model_user_user_group->addPermission($this->user->getGroupId(), 'access', 'extension/module/websky_lightning'); $this->model_user_user_group->addPermission($this->user->getGroupId(), 'modify', 'extension/module/websky_lightning'); $this->load->model('setting/setting'); $this->model_setting_setting->editSetting('module_websky_lightning', array('module_websky_lightning_status'=>1,'module_websky_lightning_page_cache'=>0,'module_websky_lightning_query_cache'=>0,'module_websky_lightning_webp'=>0)); }
+    public function install() { $this->load->model('user/user_group'); $this->model_user_user_group->addPermission($this->user->getGroupId(), 'access', 'extension/module/websky_lightning'); $this->model_user_user_group->addPermission($this->user->getGroupId(), 'modify', 'extension/module/websky_lightning'); $this->load->model('setting/setting'); $this->model_setting_setting->editSetting('module_websky_lightning', array('module_websky_lightning_status'=>1,'module_websky_lightning_page_cache'=>0,'module_websky_lightning_query_cache'=>0,'module_websky_lightning_webp'=>0,'module_websky_lightning_cache_scope'=>'core')); }
 }
