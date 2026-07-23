@@ -1,0 +1,71 @@
+name: Notify Version API on Tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check version API token
+        id: credentials
+        env:
+          VERSION_API_TOKEN: ${{ secrets.VERSION_API_TOKEN }}
+        run: |
+          if [[ -n "$VERSION_API_TOKEN" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::VERSION_API_TOKEN secret is not configured."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout release commit
+        if: steps.credentials.outputs.configured == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Extract version and release details
+        if: steps.credentials.outputs.configured == 'true'
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          MODULE="${GITHUB_REPOSITORY##*/}"
+          SOURCE_SHA="$GITHUB_SHA"
+          SUBJECT="$(git log -1 --format=%s "$SOURCE_SHA")"
+
+          if [[ "$SUBJECT" == "release: v${VERSION}" ]]; then
+            SOURCE_SHA="$(git rev-parse "$SOURCE_SHA^")"
+            SUBJECT="$(git log -1 --format=%s "$SOURCE_SHA")"
+          fi
+
+          BODY="$(git log -1 --format=%b "$SOURCE_SHA")"
+          RELEASED_AT="$(git log -1 --format=%cI "$SOURCE_SHA")"
+          {
+            echo "version=$VERSION"
+            echo "module=$MODULE"
+            echo "released_at=$RELEASED_AT"
+            echo "description<<EOF"
+            echo "$SUBJECT"
+            [[ -n "$BODY" ]] && echo && echo "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify OpenCart-Ir version service
+        if: steps.credentials.outputs.configured == 'true'
+        env:
+          VERSION_API_TOKEN: ${{ secrets.VERSION_API_TOKEN }}
+        run: |
+          curl --fail-with-body -G "https://opencart-ir.com/version/index.php" \
+            --data-urlencode "route=tool/websky_version" \
+            --data-urlencode "token=${VERSION_API_TOKEN}" \
+            --data-urlencode "module=${{ steps.release.outputs.module }}" \
+            --data-urlencode "version=${{ steps.release.outputs.version }}" \
+            --data-urlencode "released_at=${{ steps.release.outputs.released_at }}" \
+            --data-urlencode "description=${{ steps.release.outputs.description }}"
