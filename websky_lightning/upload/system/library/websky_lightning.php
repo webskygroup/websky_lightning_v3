@@ -170,7 +170,9 @@ class WebskyLightning {
         if (!$request || !isset($request->server['REQUEST_METHOD']) || strtoupper($request->server['REQUEST_METHOD']) !== 'GET') { return false; }
         if (isset($request->get['websky_bypass'])) { return false; }
         if (!empty($request->server['HTTP_X_REQUESTED_WITH'])) { return false; }
-        if ($session && (!empty($session->data['customer_id']) || !empty($session->data['customer']) || !empty($session->data['cart']) || !empty($session->data['guest']))) { return false; }
+        // Anonymous sessions may contain OpenCart's guest marker. Keep them
+        // on the shared page cache unless customer or cart state is present.
+        if ($session && (!empty($session->data['customer_id']) || !empty($session->data['customer']) || !empty($session->data['cart']))) { return false; }
         $route = self::detectedRoute($registry);
         $scope = $config ? $config->get('module_websky_lightning_cache_scope') : 'core';
         if ($scope === 'all') {
