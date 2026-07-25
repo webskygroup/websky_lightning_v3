@@ -225,7 +225,7 @@ class WebskyLightning {
         parse_str($parts['query'], $query);
         foreach (array_keys($query) as $name) {
             $lower = strtolower((string)$name);
-            if (strpos($lower, 'utm_') === 0 || in_array($lower, array('gclid', 'dclid', 'fbclid', 'msclkid', 'yclid', 'mc_cid', 'mc_eid'), true)) {
+            if (strpos($lower, 'utm_') === 0 || in_array($lower, array('gclid', 'dclid', 'fbclid', 'msclkid', 'yclid', 'mc_cid', 'mc_eid', 'websky_pregen'), true)) {
                 unset($query[$name]);
             }
         }

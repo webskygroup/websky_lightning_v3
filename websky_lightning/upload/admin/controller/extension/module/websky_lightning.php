@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.8.0';
+    private $version = '1.9.0';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
 
@@ -215,6 +215,46 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
                 'speed_after_cache' => isset($after['cache']) ? $after['cache'] : array(),
                 'speed_improvement' => $this->improvement($baseline, $after)
             );
+        }
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
+    }
+
+    public function pregenerate() {
+        $json = array('success' => false, 'generated' => 0, 'hits' => 0, 'failed' => 0, 'total' => 0);
+        if (!$this->user->hasPermission('modify', 'extension/module/websky_lightning')) {
+            $json['error'] = $this->language->get('error_permission');
+        } else {
+            $offset = max(0, (int)(isset($this->request->get['offset']) ? $this->request->get['offset'] : 0));
+            $limit = min(10, max(1, (int)(isset($this->request->get['limit']) ? $this->request->get['limit'] : 10)));
+            $urls = array();
+            $urls[] = defined('HTTPS_CATALOG') ? rtrim(HTTPS_CATALOG, '/') . '/' : rtrim(HTTP_CATALOG, '/') . '/';
+            try {
+                $query = $this->db->query("SELECT `query`, `keyword` FROM `" . DB_PREFIX . "seo_url` WHERE `store_id` = 0 AND (`query` LIKE 'product_id=%' OR `query` LIKE 'category_id=%') ORDER BY `seo_url_id` ASC LIMIT " . $offset . "," . $limit);
+                foreach ($query->rows as $row) {
+                    if (!empty($row['keyword'])) { $urls[] = (defined('HTTPS_CATALOG') ? rtrim(HTTPS_CATALOG, '/') : rtrim(HTTP_CATALOG, '/')) . '/' . ltrim($row['keyword'], '/'); }
+                }
+                $count = $this->db->query("SELECT COUNT(*) AS total FROM `" . DB_PREFIX . "seo_url` WHERE `store_id` = 0 AND (`query` LIKE 'product_id=%' OR `query` LIKE 'category_id=%')");
+                $json['total'] = isset($count->row['total']) ? (int)$count->row['total'] : count($urls) - 1;
+            } catch (Exception $e) {
+                $json['error'] = 'SEO URL table is unavailable';
+            }
+            if (empty($json['error']) && function_exists('curl_init')) {
+                foreach (array_unique($urls) as $url) {
+                    $target = $url . (strpos($url, '?') === false ? '?' : '&') . 'websky_pregen=1';
+                    $ch = curl_init($target);
+                    curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => 'Websky-Lightning-PreGenerator/1.0'));
+                    curl_exec($ch);
+                    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $time = (float)curl_getinfo($ch, CURLINFO_TOTAL_TIME);
+                    curl_close($ch);
+                    if ($code === 200) { $time < 1.0 ? $json['hits']++ : $json['generated']++; } else { $json['failed']++; }
+                }
+                $json['success'] = true;
+                $json['next_offset'] = $offset + $limit;
+            } elseif (empty($json['error'])) {
+                $json['error'] = 'cURL is required for safe pre-generation';
+            }
         }
         $this->response->addHeader('Content-Type: application/json');
         $this->response->setOutput(json_encode($json));
