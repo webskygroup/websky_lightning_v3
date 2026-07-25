@@ -7,7 +7,7 @@ class WebskyLightning {
         if (!$config->get('module_websky_lightning_status') || !$config->get('module_websky_lightning_page_cache')) { return; }
         $file = self::cacheFile($registry);
         $ttl = (int)$config->get('module_websky_lightning_cache_ttl');
-        if ($ttl < 60) { $ttl = 900; }
+        if ($ttl < 3600) { $ttl = 3600; }
         if (is_file($file) && filemtime($file) >= time() - $ttl) {
             self::record('hit');
             $content = @file_get_contents($file);
@@ -209,13 +209,29 @@ class WebskyLightning {
 
     private static function cacheFile($registry) {
         $request = $registry->get('request'); $session = $registry->get('session'); $config = $registry->get('config');
-        $uri = isset($request->server['REQUEST_URI']) ? $request->server['REQUEST_URI'] : '/';
+        $uri = self::normalizedUri(isset($request->server['REQUEST_URI']) ? $request->server['REQUEST_URI'] : '/');
         $language = $session && isset($session->data['language']) ? $session->data['language'] : $config->get('config_language');
         $currency = $session && isset($session->data['currency']) ? $session->data['currency'] : $config->get('config_currency');
         $acceptsWebp = !empty($request->server['HTTP_ACCEPT']) && strpos($request->server['HTTP_ACCEPT'], 'image/webp') !== false ? 'webp' : 'legacy';
         $scope = $config->get('module_websky_lightning_cache_scope') === 'all' ? 'all' : 'core';
         $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $scope . '|' . $uri;
         return self::cacheDirectory() . $scope . '_' . hash('sha256', $key) . '.html';
+    }
+
+    private static function normalizedUri($uri) {
+        $parts = parse_url((string)$uri);
+        $path = isset($parts['path']) && $parts['path'] !== '' ? $parts['path'] : '/';
+        if (empty($parts['query'])) { return $path; }
+        parse_str($parts['query'], $query);
+        foreach (array_keys($query) as $name) {
+            $lower = strtolower((string)$name);
+            if (strpos($lower, 'utm_') === 0 || in_array($lower, array('gclid', 'dclid', 'fbclid', 'msclkid', 'yclid', 'mc_cid', 'mc_eid'), true)) {
+                unset($query[$name]);
+            }
+        }
+        if (!$query) { return $path; }
+        ksort($query);
+        return $path . '?' . http_build_query($query, '', '&');
     }
 
     private static function catalogRequest() {
