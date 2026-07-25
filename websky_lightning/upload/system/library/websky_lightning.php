@@ -79,7 +79,7 @@ class WebskyLightning {
         if (preg_match('/^(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|CREATE|DROP|RENAME)\b/i', $trimmed)) {
             $result = $adaptor->query($sql);
             self::invalidateDatabaseCache();
-            if (self::changesStorefrontContent($trimmed)) {
+            if (self::adminRequest() && self::changesStorefrontContent($trimmed)) {
                 self::invalidatePageCache();
             }
             return $result;
@@ -137,7 +137,7 @@ class WebskyLightning {
 
     private static function changesStorefrontContent($sql) {
         return (bool)preg_match(
-            '/\b[a-z0-9_]*(?:product(?:_[a-z0-9_]+)?|category(?:_[a-z0-9_]+)?|manufacturer(?:_[a-z0-9_]+)?|information(?:_[a-z0-9_]+)?|banner(?:_[a-z0-9_]+)?|review|seo_url|setting|store|language|currency|tax_(?:class|rate|rule)|layout(?:_[a-z0-9_]+)?)\b/i',
+            '/\b[a-z0-9_]*(?:product(?:_[a-z0-9_]+)?|category(?:_[a-z0-9_]+)?|manufacturer(?:_[a-z0-9_]+)?|information(?:_[a-z0-9_]+)?|banner(?:_[a-z0-9_]+)?|review|seo_url)\b/i',
             $sql
         );
     }
@@ -253,6 +253,10 @@ class WebskyLightning {
 
     private static function catalogRequest() {
         return defined('DIR_APPLICATION') && strtolower(basename(rtrim(DIR_APPLICATION, '/\\'))) === 'catalog';
+    }
+
+    private static function adminRequest() {
+        return defined('DIR_APPLICATION') && strtolower(basename(rtrim(DIR_APPLICATION, '/\\'))) === 'admin';
     }
 
     private static function record($type) {
