@@ -79,6 +79,9 @@ class WebskyLightning {
         if (preg_match('/^(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|CREATE|DROP|RENAME)\b/i', $trimmed)) {
             $result = $adaptor->query($sql);
             self::invalidateDatabaseCache();
+            if (self::changesStorefrontContent($trimmed)) {
+                self::invalidatePageCache();
+            }
             return $result;
         }
 
@@ -123,6 +126,20 @@ class WebskyLightning {
             ftruncate($handle, 0); rewind($handle); fwrite($handle, (string)($value + 1)); fflush($handle); flock($handle, LOCK_UN);
         }
         fclose($handle);
+    }
+
+    public static function invalidatePageCache() {
+        $dir = self::cacheDirectory();
+        foreach (glob($dir . '*.html') ?: array() as $file) {
+            if (is_file($file)) { @unlink($file); }
+        }
+    }
+
+    private static function changesStorefrontContent($sql) {
+        return (bool)preg_match(
+            '/\b[a-z0-9_]*(?:product(?:_[a-z0-9_]+)?|category(?:_[a-z0-9_]+)?|manufacturer(?:_[a-z0-9_]+)?|information(?:_[a-z0-9_]+)?|banner(?:_[a-z0-9_]+)?|review|seo_url|setting|store|language|currency|tax_(?:class|rate|rule)|layout(?:_[a-z0-9_]+)?)\b/i',
+            $sql
+        );
     }
 
     private static function cacheableDatabaseQuery($sql) {
