@@ -5,6 +5,7 @@ class WebskyLightning {
         if (!self::catalogRequest() || !self::eligible($registry)) { return; }
         $config = $registry->get('config');
         if (!$config->get('module_websky_lightning_status') || !$config->get('module_websky_lightning_page_cache')) { return; }
+        if (mt_rand(1, 100) === 1) { self::prunePageCache(self::cacheDirectory(), max(3600, (int)$config->get('module_websky_lightning_cache_ttl'))); }
         $file = self::cacheFile($registry);
         $ttl = (int)$config->get('module_websky_lightning_cache_ttl');
         if ($ttl < 3600) { $ttl = 3600; }
@@ -231,8 +232,25 @@ class WebskyLightning {
         $currency = $session && isset($session->data['currency']) ? $session->data['currency'] : $config->get('config_currency');
         $acceptsWebp = !empty($request->server['HTTP_ACCEPT']) && strpos($request->server['HTTP_ACCEPT'], 'image/webp') !== false ? 'webp' : 'legacy';
         $scope = $config->get('module_websky_lightning_cache_scope') === 'all' ? 'all' : 'core';
-        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $scope . '|' . $uri;
+        $device = self::deviceClass($request);
+        // Keep desktop cache keys compatible while isolating responsive mobile/tablet HTML.
+        $deviceKey = $device === 'desktop' ? '' : '|' . $device;
+        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $scope . $deviceKey . '|' . $uri;
         return self::cacheDirectory() . $scope . '_' . hash('sha256', $key) . '.html';
+    }
+
+    private static function deviceClass($request) {
+        $ua = strtolower(isset($request->server['HTTP_USER_AGENT']) ? (string)$request->server['HTTP_USER_AGENT'] : '');
+        if (preg_match('/ipad|tablet|playbook|silk|android(?!.*mobile)/i', $ua)) { return 'tablet'; }
+        if (preg_match('/mobile|iphone|ipod|android|blackberry|windows phone|opera mini/i', $ua)) { return 'mobile'; }
+        return 'desktop';
+    }
+
+    private static function prunePageCache($dir, $ttl) {
+        $cutoff = time() - max(86400, $ttl * 2);
+        foreach (glob($dir . '*.html') ?: array() as $file) {
+            if (is_file($file) && @filemtime($file) < $cutoff) { @unlink($file); }
+        }
     }
 
     private static function normalizedUri($uri) {
