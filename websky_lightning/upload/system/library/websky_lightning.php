@@ -11,17 +11,19 @@ class WebskyLightning {
         if ($ttl < 3600) { $ttl = 3600; }
         if (is_file($file) && filemtime($file) >= time() - $ttl) {
             self::record('hit');
-            $content = @file_get_contents($file);
-            if (!is_string($content)) { return; }
             $acceptsGzip = !empty($_SERVER['HTTP_ACCEPT_ENCODING']) && strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') !== false;
             $useGzip = $acceptsGzip && function_exists('gzencode') && !ini_get('zlib.output_compression');
+            $gzipFile = $file . '.gz';
+            $serveFile = $useGzip && is_file($gzipFile) && filemtime($gzipFile) >= filemtime($file) ? $gzipFile : $file;
+            $content = @file_get_contents($serveFile);
+            if (!is_string($content)) { return; }
             if (!headers_sent()) {
                 header('X-Websky-Cache: HIT');
                 header('X-Websky-Cache-Age: ' . (time() - filemtime($file)));
                 header('Vary: Accept, Accept-Encoding', false);
-                if ($useGzip) { header('Content-Encoding: gzip'); }
+                if ($useGzip && $serveFile === $gzipFile) { header('Content-Encoding: gzip'); }
             }
-            echo $useGzip ? gzencode($content, 6) : $content;
+            echo ($useGzip && $serveFile === $gzipFile) ? $content : ($useGzip ? gzencode($content, 6) : $content);
             exit;
         }
         self::record('miss');
@@ -40,7 +42,13 @@ class WebskyLightning {
             $dir = dirname(self::$captureFile);
             if ((is_dir($dir) || @mkdir($dir, 0755, true)) && is_writable($dir)) {
                 $tmp = self::$captureFile . '.' . getmypid() . '.tmp';
-                if (@file_put_contents($tmp, $content, LOCK_EX) !== false) { @rename($tmp, self::$captureFile); } else { @unlink($tmp); }
+                if (@file_put_contents($tmp, $content, LOCK_EX) !== false) {
+                    @rename($tmp, self::$captureFile);
+                    if (function_exists('gzencode')) {
+                        $gzipTmp = self::$captureFile . '.gz.' . getmypid() . '.tmp';
+                        if (@file_put_contents($gzipTmp, gzencode($content, 6), LOCK_EX) !== false) { @rename($gzipTmp, self::$captureFile . '.gz'); } else { @unlink($gzipTmp); }
+                    }
+                } else { @unlink($tmp); }
             }
         }
         return $output;
@@ -132,7 +140,7 @@ class WebskyLightning {
     public static function invalidatePageCache() {
         $dir = self::cacheDirectory();
         foreach (glob($dir . '*.html') ?: array() as $file) {
-            if (is_file($file)) { @unlink($file); }
+            if (is_file($file)) { @unlink($file); @unlink($file . '.gz'); }
         }
     }
 
@@ -249,7 +257,7 @@ class WebskyLightning {
     private static function prunePageCache($dir, $ttl) {
         $cutoff = time() - max(86400, $ttl * 2);
         foreach (glob($dir . '*.html') ?: array() as $file) {
-            if (is_file($file) && @filemtime($file) < $cutoff) { @unlink($file); }
+            if (is_file($file) && @filemtime($file) < $cutoff) { @unlink($file); @unlink($file . '.gz'); }
         }
     }
 
