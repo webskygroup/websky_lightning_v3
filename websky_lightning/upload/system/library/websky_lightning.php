@@ -51,6 +51,12 @@ class WebskyLightning {
                 } else { @unlink($tmp); }
             }
         }
+        $acceptsGzip = !empty($_SERVER['HTTP_ACCEPT_ENCODING']) && strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') !== false;
+        if ($acceptsGzip && function_exists('gzencode') && !ini_get('zlib.output_compression') && !headers_sent()) {
+            header('Content-Encoding: gzip');
+            header('Vary: Accept, Accept-Encoding', false);
+            return gzencode($content, 6);
+        }
         return $output;
     }
 
