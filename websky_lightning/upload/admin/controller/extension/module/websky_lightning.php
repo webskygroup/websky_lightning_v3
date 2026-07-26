@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.12.0';
+    private $version = '1.13.0';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
 
@@ -232,7 +232,10 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
             try {
                 $query = $this->db->query("SELECT `query`, `keyword` FROM `" . DB_PREFIX . "seo_url` WHERE `store_id` = 0 AND (`query` LIKE 'product_id=%' OR `query` LIKE 'category_id=%') ORDER BY `seo_url_id` ASC LIMIT " . $offset . "," . $limit);
                 foreach ($query->rows as $row) {
-                    if (!empty($row['keyword'])) { $urls[] = (defined('HTTPS_CATALOG') ? rtrim(HTTPS_CATALOG, '/') : rtrim(HTTP_CATALOG, '/')) . '/' . ltrim($row['keyword'], '/'); }
+                    if (!empty($row['keyword'])) {
+                        $prefix = (strpos((string)$row['query'], 'category_id=') === 0) ? '/category/' : '/product/';
+                        $urls[] = (defined('HTTPS_CATALOG') ? rtrim(HTTPS_CATALOG, '/') : rtrim(HTTP_CATALOG, '/')) . $prefix . ltrim($row['keyword'], '/');
+                    }
                 }
                 $count = $this->db->query("SELECT COUNT(*) AS total FROM `" . DB_PREFIX . "seo_url` WHERE `store_id` = 0 AND (`query` LIKE 'product_id=%' OR `query` LIKE 'category_id=%')");
                 $json['total'] = isset($count->row['total']) ? (int)$count->row['total'] : count($urls) - 1;
