@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.14.3</version>
+  <version>1.15.0</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -45,7 +45,7 @@
     <operation error="log">
       <search><![CDATA[$image_new = str_replace(' ', '%20', $image_new);]]></search>
       <add position="before"><![CDATA[
-        if ($this->config->get('module_websky_lightning_status') && $this->config->get('module_websky_lightning_webp') && !empty($this->request->server['HTTP_ACCEPT']) && strpos($this->request->server['HTTP_ACCEPT'], 'image/webp') !== false && is_file(DIR_SYSTEM . 'library/websky_lightning.php')) {
+        if ($this->config->get('module_websky_lightning_status') && $this->config->get('module_websky_lightning_webp') && !defined('WEBSKY_LIGHTNING_PAGE_CACHE_RENDER') && !empty($this->request->server['HTTP_ACCEPT']) && strpos($this->request->server['HTTP_ACCEPT'], 'image/webp') !== false && is_file(DIR_SYSTEM . 'library/websky_lightning.php')) {
             require_once(DIR_SYSTEM . 'library/websky_lightning.php');
             $websky_file = WebskyLightning::webp(DIR_IMAGE . $image_new);
             if ($websky_file !== DIR_IMAGE . $image_new) { $image_new = substr($websky_file, strlen(DIR_IMAGE)); }

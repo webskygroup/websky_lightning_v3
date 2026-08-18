@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.14.3';
+    private $version = '1.15.0';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
 
@@ -33,8 +33,8 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
             'text_server','text_avg','text_median','text_p95','text_ttfb','text_min','text_max','text_http','text_response_size','text_improvement',
             'text_update','text_current_version','text_latest_version','text_release_date','text_changelog','text_update_status',
             'text_up_to_date','text_update_available','text_update_unavailable','button_download_update','button_check_update',
-            'text_cpu_load','text_cache_hit_rate','text_cached_pages_graph','text_live_overview','text_hits','text_misses',
-            'entry_status','entry_page_cache','entry_query_cache','entry_webp','entry_cache_scope','text_scope_core','text_scope_all','help_cache_scope','button_save','button_cancel',
+            'text_cpu_load','text_cache_hit_rate','text_cached_pages_graph','text_live_overview','text_hits','text_misses','text_pregenerate','text_pregenerate_done',
+            'entry_status','entry_page_cache','entry_query_cache','entry_webp','entry_cache_scope','text_scope_core','text_scope_all','help_cache_scope','button_save','button_cancel','button_pregenerate',
             'button_test_before','button_test_after','button_clear_cache','button_refresh','error_permission'
         ) as $key) { $data[$key] = $this->language->get($key); }
 
@@ -44,6 +44,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         $data['clear_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning/clearCache', 'user_token=' . $this->session->data['user_token'], true), ENT_QUOTES, 'UTF-8');
         $data['update_check_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning', 'user_token=' . $this->session->data['user_token'] . '&refresh_update=1#tab-update', true), ENT_QUOTES, 'UTF-8');
         $data['upgrade_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning/upgrade', 'user_token=' . $this->session->data['user_token'], true), ENT_QUOTES, 'UTF-8');
+        $data['pregenerate_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning/pregenerate', 'user_token=' . $this->session->data['user_token'], true), ENT_QUOTES, 'UTF-8');
 
         $defaults = array('status' => 1, 'page_cache' => 0, 'query_cache' => 0, 'webp' => 0);
         foreach ($defaults as $key => $default) {
@@ -226,7 +227,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
             $json['error'] = $this->language->get('error_permission');
         } else {
             $offset = max(0, (int)(isset($this->request->get['offset']) ? $this->request->get['offset'] : 0));
-            $limit = min(10, max(1, (int)(isset($this->request->get['limit']) ? $this->request->get['limit'] : 10)));
+            $limit = min(10, max(1, (int)(isset($this->request->get['limit']) ? $this->request->get['limit'] : 5)));
             $urls = array();
             $urls[] = defined('HTTPS_CATALOG') ? rtrim(HTTPS_CATALOG, '/') . '/' : rtrim(HTTP_CATALOG, '/') . '/';
             try {
@@ -248,22 +249,16 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
                     'mobile' => 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36',
                     'tablet' => 'Mozilla/5.0 (Linux; Android 14; Tablet) AppleWebKit/537.36 Chrome/126.0 Safari/537.36'
                 );
-                $formats = array(
-                    'modern' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                    'legacy' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-                );
                 foreach (array_unique($urls) as $url) {
                     foreach ($devices as $device => $user_agent) {
-                        foreach ($formats as $format => $accept) {
-                            $target = $url . (strpos($url, '?') === false ? '?' : '&') . 'websky_pregen=1';
-                            $ch = curl_init($target);
-                            curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => $user_agent, CURLOPT_HTTPHEADER => array('Accept: ' . $accept, 'X-Websky-PreGenerate: ' . $device . '-' . $format)));
-                            curl_exec($ch);
-                            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                            $time = (float)curl_getinfo($ch, CURLINFO_TOTAL_TIME);
-                            curl_close($ch);
-                            if ($code === 200) { $time < 1.0 ? $json['hits']++ : $json['generated']++; } else { $json['failed']++; }
-                        }
+                        $target = $url . (strpos($url, '?') === false ? '?' : '&') . 'websky_pregen=1';
+                        $ch = curl_init($target);
+                        curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 30, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => $user_agent, CURLOPT_HTTPHEADER => array('Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'X-Websky-PreGenerate: ' . $device)));
+                        curl_exec($ch);
+                        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $time = (float)curl_getinfo($ch, CURLINFO_TOTAL_TIME);
+                        curl_close($ch);
+                        if ($code === 200) { $time < 1.0 ? $json['hits']++ : $json['generated']++; } else { $json['failed']++; }
                     }
                 }
                 $json['success'] = true;

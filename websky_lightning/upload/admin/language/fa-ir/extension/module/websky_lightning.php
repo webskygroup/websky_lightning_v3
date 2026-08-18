@@ -30,3 +30,4 @@ $_['text_update'] = 'به‌روزرسانی'; $_['text_current_version'] = 'ن�
 $_['text_up_to_date'] = 'وب‌اسکای لایتنینگ به‌روز است.'; $_['text_update_available'] = 'نسخه جدیدی برای دریافت موجود است.'; $_['text_update_unavailable'] = 'ارتباط با سرویس به‌روزرسانی برقرار نشد؛ نسخه نصب‌شده همچنان فعال است.';
 $_['button_download_update'] = 'دریافت به‌روزرسانی'; $_['button_check_update'] = 'بررسی مجدد'; $_['text_upgrade_success'] = 'بروزرسانی وب‌اسکای لایتنینگ با موفقیت انجام شد.';
 $_['text_cpu_load'] = 'بار پردازنده'; $_['text_cache_hit_rate'] = 'نرخ اصابت کش'; $_['text_cached_pages_graph'] = 'صفحات کش‌شده'; $_['text_live_overview'] = 'نمای زنده عملکرد'; $_['text_hits'] = 'اصابت‌ها'; $_['text_misses'] = 'خطاهای کش';
+$_['button_pregenerate'] = 'کش‌کردن همه صفحات'; $_['text_pregenerate'] = 'در حال کش‌کردن محصولات و دسته‌بندی‌ها'; $_['text_pregenerate_done'] = 'کش کامل فروشگاه ساخته شد.';

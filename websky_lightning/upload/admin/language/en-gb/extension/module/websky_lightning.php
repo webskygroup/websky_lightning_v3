@@ -20,3 +20,4 @@ $_['text_update'] = 'Updates'; $_['text_current_version'] = 'Current version'; $
 $_['text_up_to_date'] = 'Websky Lightning is up to date.'; $_['text_update_available'] = 'A newer version is available.'; $_['text_update_unavailable'] = 'Could not contact the update service. The installed version remains active.';
 $_['button_download_update'] = 'Download update'; $_['button_check_update'] = 'Check again'; $_['text_upgrade_success'] = 'Websky Lightning was updated successfully.';
 $_['text_cpu_load'] = 'CPU load'; $_['text_cache_hit_rate'] = 'Cache hit rate'; $_['text_cached_pages_graph'] = 'Cached pages'; $_['text_live_overview'] = 'Live performance overview'; $_['text_hits'] = 'Hits'; $_['text_misses'] = 'Misses';
+$_['button_pregenerate'] = 'Cache all pages'; $_['text_pregenerate'] = 'Caching products and categories'; $_['text_pregenerate_done'] = 'The complete storefront cache has been generated.';

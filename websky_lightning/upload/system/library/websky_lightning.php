@@ -36,6 +36,7 @@ class WebskyLightning {
         }
         self::$captureFile = $file;
         self::$captureMeta = self::cacheMetadata($registry);
+        if (!defined('WEBSKY_LIGHTNING_PAGE_CACHE_RENDER')) { define('WEBSKY_LIGHTNING_PAGE_CACHE_RENDER', true); }
         ob_start(array(__CLASS__, 'capture'));
     }
 
@@ -276,11 +277,10 @@ class WebskyLightning {
         $uri = self::normalizedUri(isset($request->server['REQUEST_URI']) ? $request->server['REQUEST_URI'] : '/');
         $language = $session && isset($session->data['language']) ? $session->data['language'] : $config->get('config_language');
         $currency = $session && isset($session->data['currency']) ? $session->data['currency'] : $config->get('config_currency');
-        $acceptsWebp = !empty($request->server['HTTP_ACCEPT']) && strpos($request->server['HTTP_ACCEPT'], 'image/webp') !== false ? 'webp' : 'legacy';
         $scope = $config->get('module_websky_lightning_cache_scope') === 'all' ? 'all' : 'core';
         $device = self::deviceClass($request);
         $customerGroup = self::customerGroupId($registry);
-        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $scope . '|group-' . $customerGroup . '|' . $device . '|' . $uri;
+        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $scope . '|group-' . $customerGroup . '|' . $device . '|' . $uri;
         return self::cacheDirectory() . $scope . '_' . hash('sha256', $key) . '.html';
     }
 
