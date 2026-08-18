@@ -1,9 +1,9 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.15.1';
+    private $version = '1.15.2';
     private $version_extension = 'websky_lightning_v3';
-    private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
+    private $download_url = 'https://github.com/webskygroup/websky_lightning_v3/releases/latest/download/websky_lightning.ocmod.zip';
 
     public function index() {
         $this->load->language('extension/module/websky_lightning');

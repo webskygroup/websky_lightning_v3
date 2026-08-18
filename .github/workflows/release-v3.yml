@@ -39,6 +39,7 @@ jobs:
         run: |
           cd websky_lightning
           zip -qr "../websky_lightning_v3_v${{ steps.version.outputs.version }}.ocmod.zip" upload install.xml
+          cp "../websky_lightning_v3_v${{ steps.version.outputs.version }}.ocmod.zip" "../websky_lightning.ocmod.zip"
 
       - name: Publish GitHub release
         env:
@@ -49,10 +50,10 @@ jobs:
         run: |
           asset="websky_lightning_v3_v${VERSION}.ocmod.zip"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$asset" --clobber
+            gh release upload "$TAG" "$asset" websky_lightning.ocmod.zip --clobber
             gh release edit "$TAG" --title "Websky Lightning v${VERSION}" --target v3
           else
-            gh release create "$TAG" "$asset" --target v3 --title "Websky Lightning v${VERSION}" --notes "Automated OpenCart 3 release for Websky Lightning v${VERSION}."
+            gh release create "$TAG" "$asset" websky_lightning.ocmod.zip --target v3 --title "Websky Lightning v${VERSION}" --notes "Automated OpenCart 3 release for Websky Lightning v${VERSION}."
           fi
 
       - name: Check Version API token
