@@ -94,9 +94,11 @@ function webskyLightningStopRefresh(force) {
     webskyLightningRefreshTimer = null;
   }
 }
+if (!window.webskyLightningHeaderBindings) {
+window.webskyLightningHeaderBindings = true;
+$(function() { $('.wlh-nav').slice(1).remove(); if ($('.wl-gauge.cpu').length) webskyLightningStartRefresh(); });
 $(document).on('shown.bs.dropdown', '.wlh-nav', webskyLightningStartRefresh);
 $(document).on('hidden.bs.dropdown', '.wlh-nav', function() { webskyLightningStopRefresh(false); });
-$(function() { if ($('.wl-gauge.cpu').length) webskyLightningStartRefresh(); });
 $(document).on('click', '.wlh-settings', function(e) { e.preventDefault(); window.location.href = 'index.php?route=extension/module/websky_lightning&user_token=' + encodeURIComponent(webskyLightningToken()); });
 $(document).on('click', '.wlh-speed-test', function(e) {
   e.preventDefault(); e.stopPropagation();
@@ -124,4 +126,5 @@ $(document).on('click', '.wlh-clear', function(e) {
     if (json && json.success) { $('.wlh-badge').text('0'); $('.wlh-pages b').text('0'); $('.wlh-pages').next().find('small').text('0 B'); }
   }, 'json').always(function() { button.prop('disabled', false).find('i').attr('class', 'fa fa-trash-o'); });
 });
+}
 </script>
