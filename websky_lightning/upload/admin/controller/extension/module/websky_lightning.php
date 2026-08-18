@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.15.0';
+    private $version = '1.15.1';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
 
@@ -45,6 +45,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         $data['update_check_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning', 'user_token=' . $this->session->data['user_token'] . '&refresh_update=1#tab-update', true), ENT_QUOTES, 'UTF-8');
         $data['upgrade_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning/upgrade', 'user_token=' . $this->session->data['user_token'], true), ENT_QUOTES, 'UTF-8');
         $data['pregenerate_url'] = html_entity_decode($this->url->link('extension/module/websky_lightning/pregenerate', 'user_token=' . $this->session->data['user_token'], true), ENT_QUOTES, 'UTF-8');
+        $data['start_pregenerate'] = !empty($this->request->get['start_pregenerate']);
 
         $defaults = array('status' => 1, 'page_cache' => 0, 'query_cache' => 0, 'webp' => 0);
         foreach ($defaults as $key => $default) {
