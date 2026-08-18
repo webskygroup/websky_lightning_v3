@@ -9,6 +9,9 @@ class WebskyLightning {
         $file = self::cacheFile($registry);
         if (is_file($file)) {
             self::record('hit');
+            if (!is_file($file . '.meta.json')) {
+                @file_put_contents($file . '.meta.json', json_encode(self::cacheMetadata($registry)), LOCK_EX);
+            }
             $acceptsGzip = !empty($_SERVER['HTTP_ACCEPT_ENCODING']) && strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') !== false;
             $useGzip = $acceptsGzip && function_exists('gzencode') && !ini_get('zlib.output_compression');
             $gzipFile = $file . '.gz';
