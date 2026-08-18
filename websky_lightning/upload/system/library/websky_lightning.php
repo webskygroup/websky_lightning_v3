@@ -20,6 +20,7 @@ class WebskyLightning {
             if (!headers_sent()) {
                 header('X-Websky-Cache: HIT');
                 header('X-Websky-Cache-Age: ' . (time() - filemtime($file)));
+                header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
                 header('Vary: Accept, Accept-Encoding', false);
                 if ($useGzip && $serveFile === $gzipFile) { header('Content-Encoding: gzip'); }
             }
@@ -27,7 +28,11 @@ class WebskyLightning {
             exit;
         }
         self::record('miss');
-        if (!headers_sent()) { header('X-Websky-Cache: MISS'); header('Vary: Accept, Accept-Encoding', false); }
+        if (!headers_sent()) {
+            header('X-Websky-Cache: MISS');
+            header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
+            header('Vary: Accept, Accept-Encoding', false);
+        }
         self::$captureFile = $file;
         ob_start(array(__CLASS__, 'capture'));
     }
@@ -247,10 +252,26 @@ class WebskyLightning {
         $acceptsWebp = !empty($request->server['HTTP_ACCEPT']) && strpos($request->server['HTTP_ACCEPT'], 'image/webp') !== false ? 'webp' : 'legacy';
         $scope = $config->get('module_websky_lightning_cache_scope') === 'all' ? 'all' : 'core';
         $device = self::deviceClass($request);
-        // Keep desktop cache keys compatible while isolating responsive mobile/tablet HTML.
-        $deviceKey = $device === 'desktop' ? '' : '|' . $device;
-        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $scope . $deviceKey . '|' . $uri;
+        $customerGroup = self::customerGroupId($registry);
+        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $acceptsWebp . '|' . $scope . '|group-' . $customerGroup . '|' . $device . '|' . $uri;
         return self::cacheDirectory() . $scope . '_' . hash('sha256', $key) . '.html';
+    }
+
+    private static function cacheProfile($registry) {
+        return 'group-' . self::customerGroupId($registry) . '-' . self::deviceClass($registry->get('request'));
+    }
+
+    private static function customerGroupId($registry) {
+        $session = $registry->get('session');
+        if ($session && isset($session->data['customer_group_id'])) {
+            return max(0, (int)$session->data['customer_group_id']);
+        }
+        $customer = $registry->get('customer');
+        if ($customer && method_exists($customer, 'getGroupId')) {
+            return max(0, (int)$customer->getGroupId());
+        }
+        $config = $registry->get('config');
+        return $config ? max(0, (int)$config->get('config_customer_group_id')) : 0;
     }
 
     private static function deviceClass($request) {

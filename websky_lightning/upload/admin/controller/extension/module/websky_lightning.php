@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.13.0';
+    private $version = '1.14.0';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://opencart-ir.com/dl/v3/websky_lightning.ocmod.zip883948';
 
@@ -243,15 +243,22 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
                 $json['error'] = 'SEO URL table is unavailable';
             }
             if (empty($json['error']) && function_exists('curl_init')) {
+                $profiles = array(
+                    'desktop' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36',
+                    'mobile' => 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36',
+                    'tablet' => 'Mozilla/5.0 (Linux; Android 14; Tablet) AppleWebKit/537.36 Chrome/126.0 Safari/537.36'
+                );
                 foreach (array_unique($urls) as $url) {
-                    $target = $url . (strpos($url, '?') === false ? '?' : '&') . 'websky_pregen=1';
-                    $ch = curl_init($target);
-                    curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => 'Websky-Lightning-PreGenerator/1.0'));
-                    curl_exec($ch);
-                    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $time = (float)curl_getinfo($ch, CURLINFO_TOTAL_TIME);
-                    curl_close($ch);
-                    if ($code === 200) { $time < 1.0 ? $json['hits']++ : $json['generated']++; } else { $json['failed']++; }
+                    foreach ($profiles as $profile => $user_agent) {
+                        $target = $url . (strpos($url, '?') === false ? '?' : '&') . 'websky_pregen=1';
+                        $ch = curl_init($target);
+                        curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 20, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => $user_agent, CURLOPT_HTTPHEADER => array('X-Websky-PreGenerate: ' . $profile)));
+                        curl_exec($ch);
+                        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $time = (float)curl_getinfo($ch, CURLINFO_TOTAL_TIME);
+                        curl_close($ch);
+                        if ($code === 200) { $time < 1.0 ? $json['hits']++ : $json['generated']++; } else { $json['failed']++; }
+                    }
                 }
                 $json['success'] = true;
                 $json['next_offset'] = $offset + $limit;
