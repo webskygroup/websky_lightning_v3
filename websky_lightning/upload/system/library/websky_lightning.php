@@ -1,15 +1,13 @@
 <?php
 class WebskyLightning {
     private static $captureFile = '';
+    private static $captureMeta = array();
     public static function serve($registry) {
         if (!self::catalogRequest() || !self::eligible($registry)) { return; }
         $config = $registry->get('config');
         if (!$config->get('module_websky_lightning_status') || !$config->get('module_websky_lightning_page_cache')) { return; }
-        if (mt_rand(1, 100) === 1) { self::prunePageCache(self::cacheDirectory(), max(3600, (int)$config->get('module_websky_lightning_cache_ttl'))); }
         $file = self::cacheFile($registry);
-        $ttl = (int)$config->get('module_websky_lightning_cache_ttl');
-        if ($ttl < 3600) { $ttl = 3600; }
-        if (is_file($file) && filemtime($file) >= time() - $ttl) {
+        if (is_file($file)) {
             self::record('hit');
             $acceptsGzip = !empty($_SERVER['HTTP_ACCEPT_ENCODING']) && strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') !== false;
             $useGzip = $acceptsGzip && function_exists('gzencode') && !ini_get('zlib.output_compression');
@@ -34,6 +32,7 @@ class WebskyLightning {
             header('Vary: Accept, Accept-Encoding', false);
         }
         self::$captureFile = $file;
+        self::$captureMeta = self::cacheMetadata($registry);
         ob_start(array(__CLASS__, 'capture'));
     }
 
@@ -53,6 +52,7 @@ class WebskyLightning {
                         $gzipTmp = self::$captureFile . '.gz.' . getmypid() . '.tmp';
                         if (@file_put_contents($gzipTmp, gzencode($content, 6), LOCK_EX) !== false) { @rename($gzipTmp, self::$captureFile . '.gz'); } else { @unlink($gzipTmp); }
                     }
+                    @file_put_contents(self::$captureFile . '.meta.json', json_encode(self::$captureMeta), LOCK_EX);
                 } else { @unlink($tmp); }
             }
         }
@@ -99,9 +99,7 @@ class WebskyLightning {
         if (preg_match('/^(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|CREATE|DROP|RENAME)\b/i', $trimmed)) {
             $result = $adaptor->query($sql);
             self::invalidateDatabaseCache();
-            if (self::adminRequest() && self::changesStorefrontContent($trimmed)) {
-                self::invalidatePageCache();
-            }
+            if (self::adminRequest()) { self::invalidatePageCacheForSql($trimmed); }
             return $result;
         }
 
@@ -151,15 +149,41 @@ class WebskyLightning {
     public static function invalidatePageCache() {
         $dir = self::cacheDirectory();
         foreach (glob($dir . '*.html') ?: array() as $file) {
-            if (is_file($file)) { @unlink($file); @unlink($file . '.gz'); }
+            if (is_file($file)) { self::deletePageCacheFile($file); }
         }
     }
 
-    private static function changesStorefrontContent($sql) {
-        return (bool)preg_match(
-            '/\b[a-z0-9_]*(?:product(?:_[a-z0-9_]+)?|category(?:_[a-z0-9_]+)?|manufacturer(?:_[a-z0-9_]+)?|information(?:_[a-z0-9_]+)?|banner(?:_[a-z0-9_]+)?|review|seo_url)\b/i',
-            $sql
-        );
+    private static function invalidatePageCacheForSql($sql) {
+        $productChange = (bool)preg_match('/\b[a-z0-9_]*product(?:_[a-z0-9_]+)?\b/i', $sql);
+        $categoryChange = (bool)preg_match('/\b[a-z0-9_]*category(?:_[a-z0-9_]+)?\b/i', $sql);
+        if (!$productChange && !$categoryChange) { return; }
+
+        $productIds = self::sqlIds($sql, 'product_id');
+        $categoryIds = self::sqlIds($sql, 'category_id');
+        foreach (glob(self::cacheDirectory() . '*.html.meta.json') ?: array() as $metaFile) {
+            $meta = json_decode((string)@file_get_contents($metaFile), true);
+            if (!is_array($meta) || empty($meta['route'])) { continue; }
+            $remove = false;
+            if ($productChange) {
+                $remove = in_array($meta['route'], array('common/home', 'product/category'), true);
+                if ($meta['route'] === 'product/product' && (!$productIds || in_array((int)$meta['product_id'], $productIds, true))) { $remove = true; }
+            }
+            if ($categoryChange && in_array($meta['route'], array('common/home', 'product/category'), true)) {
+                $remove = !$categoryIds || $meta['route'] === 'common/home' || in_array((int)$meta['category_id'], $categoryIds, true);
+            }
+            if ($remove) { self::deletePageCacheFile(substr($metaFile, 0, -10)); }
+        }
+    }
+
+    private static function sqlIds($sql, $column) {
+        preg_match_all('/\b' . preg_quote($column, '/') . '\b\s*=\s*[\'\"]?(\d+)/i', $sql, $matches);
+        return array_values(array_unique(array_map('intval', isset($matches[1]) ? $matches[1] : array())));
+    }
+
+    private static function deletePageCacheFile($file) {
+        @unlink($file);
+        @unlink($file . '.gz');
+        @unlink($file . '.meta.json');
     }
 
     private static function cacheableDatabaseQuery($sql) {
@@ -257,6 +281,19 @@ class WebskyLightning {
         return self::cacheDirectory() . $scope . '_' . hash('sha256', $key) . '.html';
     }
 
+    private static function cacheMetadata($registry) {
+        $request = $registry->get('request');
+        $route = self::detectedRoute($registry);
+        $productId = isset($request->get['product_id']) ? (int)$request->get['product_id'] : 0;
+        $categoryId = 0;
+        if (isset($request->get['path'])) {
+            $path = array_filter(array_map('intval', explode('_', (string)$request->get['path'])));
+            if ($path) { $categoryId = (int)end($path); }
+        }
+        if (!$categoryId && isset($request->get['category_id'])) { $categoryId = (int)$request->get['category_id']; }
+        return array('route' => $route, 'product_id' => $productId, 'category_id' => $categoryId);
+    }
+
     private static function cacheProfile($registry) {
         return 'group-' . self::customerGroupId($registry) . '-' . self::deviceClass($registry->get('request'));
     }
@@ -279,13 +316,6 @@ class WebskyLightning {
         if (preg_match('/ipad|tablet|playbook|silk|android(?!.*mobile)/i', $ua)) { return 'tablet'; }
         if (preg_match('/mobile|iphone|ipod|android|blackberry|windows phone|opera mini/i', $ua)) { return 'mobile'; }
         return 'desktop';
-    }
-
-    private static function prunePageCache($dir, $ttl) {
-        $cutoff = time() - max(86400, $ttl * 2);
-        foreach (glob($dir . '*.html') ?: array() as $file) {
-            if (is_file($file) && @filemtime($file) < $cutoff) { @unlink($file); @unlink($file . '.gz'); }
-        }
     }
 
     private static function normalizedUri($uri) {

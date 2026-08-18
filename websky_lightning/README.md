@@ -9,3 +9,5 @@ Independent performance module for OpenCart 3.0.3.x. The page cache uses stable 
 3. Install and enable **Websky Lightning** under Extensions → Extensions → Modules.
 
 No external services are required. Page cache is conservative and excludes AJAX, account, checkout, API, logged-in, and cart-bearing requests. Admin pre-generation warms modern and legacy browser variants for the desktop, mobile, and tablet profiles of the default customer group. The optional cron endpoint is `index.php?route=extension/module/websky_lightning_cron&token=...`; protect its token in admin configuration before scheduling it.
+
+Full-page cache files do not expire or prune automatically. Product edits invalidate the matching product cache plus listing pages, while category edits invalidate the affected category and homepage cache. The next eligible guest request stores the replacement. Administrators can still clear every page explicitly with the module's clear-cache action.
