@@ -19,6 +19,9 @@ class WebskyLightning {
             $content = @file_get_contents($serveFile);
             if (!is_string($content)) { return; }
             if (!headers_sent()) {
+                @header_remove('Set-Cookie');
+                @header_remove('Pragma');
+                header('Cache-Control: public, max-age=31536000, immutable');
                 header('X-Websky-Cache: HIT');
                 header('X-Websky-Cache-Age: ' . (time() - filemtime($file)));
                 header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
