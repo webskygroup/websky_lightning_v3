@@ -13,7 +13,7 @@ class WebskyLightning {
                 @file_put_contents($file . '.meta.json', json_encode(self::cacheMetadata($registry)), LOCK_EX);
             }
             $acceptsGzip = !empty($_SERVER['HTTP_ACCEPT_ENCODING']) && strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') !== false;
-            $useGzip = $acceptsGzip && function_exists('gzencode') && !ini_get('zlib.output_compression');
+            $useGzip = $acceptsGzip && function_exists('gzencode');
             $gzipFile = $file . '.gz';
             $serveFile = $useGzip && is_file($gzipFile) && filemtime($gzipFile) >= filemtime($file) ? $gzipFile : $file;
             $content = @file_get_contents($serveFile);
@@ -26,7 +26,11 @@ class WebskyLightning {
                 header('X-Websky-Cache-Age: ' . (time() - filemtime($file)));
                 header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
                 header('Vary: Accept, Accept-Encoding', false);
-                if ($useGzip && $serveFile === $gzipFile) { header('Content-Encoding: gzip'); }
+                if ($useGzip && $serveFile === $gzipFile) {
+                    @ini_set('zlib.output_compression', '0');
+                    header('Content-Encoding: gzip');
+                    header('Content-Length: ' . strlen($content));
+                }
             }
             echo ($useGzip && $serveFile === $gzipFile) ? $content : ($useGzip ? gzencode($content, 6) : $content);
             exit;

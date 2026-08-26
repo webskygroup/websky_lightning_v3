@@ -13,3 +13,5 @@ No external services are required. Page cache is conservative and excludes AJAX,
 Full-page cache files do not expire or prune automatically. Product edits invalidate the matching product cache plus listing pages, while category edits invalidate the affected category and homepage cache. The next eligible guest request stores the replacement. The admin **Cache all pages** action walks every product and category in small resumable batches and warms the safe desktop, mobile, and tablet variants. Browser capability headers do not create separate HTML page caches. Administrators can still clear every page explicitly with the module's clear-cache action.
 
 Cache hits for anonymous pages now replace session-only `no-store` headers with a one-year public cache policy and remove response cookies, while authenticated, cart, checkout, and account requests remain excluded.
+
+Precompressed page-cache files are served directly with an explicit content length, even when the host reports PHP output compression as enabled but does not compress the response itself.
