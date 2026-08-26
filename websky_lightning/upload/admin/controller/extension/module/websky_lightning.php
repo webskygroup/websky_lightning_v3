@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.16.1';
+    private $version = '1.16.2';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://github.com/webskygroup/websky_lightning_v3/releases/latest/download/websky_lightning.ocmod.zip';
 
@@ -145,6 +145,7 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
         }
         if (!$json) {
             @unlink(DIR_CACHE . 'websky_lightning_update.json');
+            $this->response->addHeader('X-LiteSpeed-Purge: *');
             $json['success'] = $this->language->get('text_upgrade_success');
         }
         $this->response->addHeader('Content-Type: application/json');
@@ -180,6 +181,18 @@ class ControllerExtensionModuleWebskyLightning extends Controller {
             foreach (glob($dir . '*') ?: array() as $file) { if (is_file($file) && @unlink($file)) { $count++; } }
             @unlink($dir . 'stats.json');
             $json = array('success' => true, 'cleared' => $count);
+        }
+        $this->response->addHeader('Content-Type: application/json');
+        $this->response->setOutput(json_encode($json));
+    }
+
+    public function purgeHttpCache() {
+        $json = array();
+        if (!$this->validate()) {
+            $json['error'] = 'Access denied';
+        } else {
+            $this->response->addHeader('X-LiteSpeed-Purge: *');
+            $json['success'] = true;
         }
         $this->response->addHeader('Content-Type: application/json');
         $this->response->setOutput(json_encode($json));
