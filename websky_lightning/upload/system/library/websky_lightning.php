@@ -22,6 +22,7 @@ class WebskyLightning {
                 @header_remove('Set-Cookie');
                 @header_remove('Pragma');
                 header('Cache-Control: public, max-age=31536000, immutable');
+                header('X-LiteSpeed-Cache-Control: no-cache');
                 header('X-Websky-Cache: HIT');
                 header('X-Websky-Cache-Age: ' . (time() - filemtime($file)));
                 header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
@@ -37,6 +38,7 @@ class WebskyLightning {
         }
         self::record('miss');
         if (!headers_sent()) {
+            header('X-LiteSpeed-Cache-Control: no-cache');
             header('X-Websky-Cache: MISS');
             header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
             header('Vary: Accept, Accept-Encoding', false);
