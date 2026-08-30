@@ -23,7 +23,7 @@ class WebskyLightning {
             $serveFile = $useGzip && is_file($gzipFile) && filemtime($gzipFile) >= filemtime($file) ? $gzipFile : $file;
             $content = @file_get_contents($serveFile);
             if (!is_string($content)) { return; }
-            $authenticated = self::authenticatedRequest($registry);
+            $authenticated = self::authenticatedRequest($registry) || !empty($_COOKIE['websky_customer']);
             if (!headers_sent()) {
                 @header_remove('Set-Cookie');
                 @header_remove('Pragma');
