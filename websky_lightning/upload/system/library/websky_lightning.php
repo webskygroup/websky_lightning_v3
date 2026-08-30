@@ -285,6 +285,7 @@ class WebskyLightning {
         $uri = isset($request->server['REQUEST_URI']) ? (string)$request->server['REQUEST_URI'] : '/';
         $path = trim((string)parse_url($uri, PHP_URL_PATH), '/');
         if ($path === '' || $path === 'index.php') { return 'common/home'; }
+        if (preg_match('#^(cart|checkout)(?:/|$)#i', $path)) { return 'checkout/cart'; }
         if (preg_match('#(?:^|/)product/#i', $path)) { return 'product/product'; }
         if (preg_match('#(?:^|/)category/#i', $path)) { return 'product/category'; }
         $segments = explode('/', $path);
