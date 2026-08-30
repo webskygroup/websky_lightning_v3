@@ -3,7 +3,12 @@ class WebskyLightning {
     private static $captureFile = '';
     private static $captureMeta = array();
     public static function serve($registry) {
-        if (!self::catalogRequest() || !self::eligible($registry)) { return; }
+        if (!self::catalogRequest()) { return; }
+        // Never allow an outer LiteSpeed/proxy cache to replay session state.
+        // This guard runs even when the page cache is disabled or the route is
+        // outside the public catalog cache allow-list.
+        self::protectPrivateRequest($registry);
+        if (!self::eligible($registry)) { return; }
         $config = $registry->get('config');
         if (!$config->get('module_websky_lightning_status') || !$config->get('module_websky_lightning_page_cache')) { return; }
         $file = self::cacheFile($registry);
@@ -47,6 +52,21 @@ class WebskyLightning {
         self::$captureMeta = self::cacheMetadata($registry);
         if (!defined('WEBSKY_LIGHTNING_PAGE_CACHE_RENDER')) { define('WEBSKY_LIGHTNING_PAGE_CACHE_RENDER', true); }
         ob_start(array(__CLASS__, 'capture'));
+    }
+
+    private static function protectPrivateRequest($registry) {
+        $request = $registry->get('request');
+        if (!$request || headers_sent()) { return; }
+        $method = isset($request->server['REQUEST_METHOD']) ? strtoupper((string)$request->server['REQUEST_METHOD']) : 'GET';
+        $route = self::detectedRoute($registry);
+        $private = $method !== 'GET' || preg_match('#^(account/|checkout/|api/|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
+        if ($private) {
+            header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+            header('X-LiteSpeed-Cache-Control: no-cache, no-store');
+            header('X-Websky-Cache: BYPASS');
+        }
     }
 
     public static function capture($output) {
