@@ -23,10 +23,11 @@ class WebskyLightning {
             $serveFile = $useGzip && is_file($gzipFile) && filemtime($gzipFile) >= filemtime($file) ? $gzipFile : $file;
             $content = @file_get_contents($serveFile);
             if (!is_string($content)) { return; }
+            $authenticated = self::authenticatedRequest($registry);
             if (!headers_sent()) {
                 @header_remove('Set-Cookie');
                 @header_remove('Pragma');
-                header('Cache-Control: public, max-age=31536000, immutable');
+                header($authenticated ? 'Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0' : 'Cache-Control: public, max-age=31536000, immutable');
                 header('X-LiteSpeed-Cache-Control: no-cache');
                 header('X-Websky-Cache: HIT');
                 header('X-Websky-Cache-Age: ' . (time() - filemtime($file)));
@@ -49,6 +50,10 @@ class WebskyLightning {
             header('X-LiteSpeed-Cache-Control: no-cache');
             header('X-Websky-Cache: MISS');
             header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
+            if (self::authenticatedRequest($registry)) {
+                header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+                header('Pragma: no-cache');
+            }
             header('Vary: Accept, Accept-Encoding', false);
             header('X-LiteSpeed-Vary: User-Agent');
         }
@@ -73,7 +78,8 @@ class WebskyLightning {
         } elseif (!empty($_COOKIE['websky_customer'])) {
             header('Set-Cookie: websky_customer=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax', false);
         }
-        $private = $method !== 'GET' || $loggedIn || $markedCustomer || preg_match('#^(account/|checkout/|api/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
+        $hasCart = $session && !empty($session->data['cart']);
+        $private = $method !== 'GET' || $markedCustomer && !$loggedIn || $hasCart || preg_match('#^(account/|checkout/|api/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
         if ($private) {
             header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
             header('Pragma: no-cache');
@@ -278,10 +284,9 @@ class WebskyLightning {
         if (!$request || !isset($request->server['REQUEST_METHOD']) || strtoupper($request->server['REQUEST_METHOD']) !== 'GET') { return false; }
         if (isset($request->get['websky_bypass'])) { return false; }
         if (!empty($request->server['HTTP_X_REQUESTED_WITH'])) { return false; }
-        if (!empty($_COOKIE['websky_customer'])) { return false; }
-        // Anonymous sessions may contain OpenCart's guest marker. Keep them
-        // on the shared page cache unless customer or cart state is present.
-        if ($session && (!empty($session->data['customer_id']) || !empty($session->data['customer']) || !empty($session->data['cart']))) { return false; }
+        // Authenticated public pages may use a per-customer cache key. Cart,
+        // account, checkout and API pages remain live/private.
+        if ($session && !empty($session->data['cart'])) { return false; }
         $route = self::detectedRoute($registry);
         $scope = $config ? $config->get('module_websky_lightning_cache_scope') : 'core';
         if ($scope === 'all') {
@@ -325,8 +330,16 @@ class WebskyLightning {
         $scope = $config->get('module_websky_lightning_cache_scope') === 'all' ? 'all' : 'core';
         $device = self::deviceClass($request);
         $customerGroup = self::customerGroupId($registry);
-        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $scope . '|group-' . $customerGroup . '|' . $device . '|' . $uri;
+        $session = $registry->get('session');
+        $customerId = $session && isset($session->data['customer_id']) ? (int)$session->data['customer_id'] : 0;
+        $identity = $customerId > 0 ? 'customer-' . $customerId : 'group-' . $customerGroup;
+        $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $scope . '|' . $identity . '|' . $device . '|' . $uri;
         return self::cacheDirectory() . $scope . '_' . hash('sha256', $key) . '.html';
+    }
+
+    private static function authenticatedRequest($registry) {
+        $session = $registry->get('session');
+        return $session && (!empty($session->data['customer_id']) || !empty($session->data['customer'])) && empty($session->data['cart']);
     }
 
     private static function cacheMetadata($registry) {
