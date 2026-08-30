@@ -63,7 +63,7 @@ class WebskyLightning {
         if (!$request || headers_sent()) { return; }
         $method = isset($request->server['REQUEST_METHOD']) ? strtoupper((string)$request->server['REQUEST_METHOD']) : 'GET';
         $route = self::detectedRoute($registry);
-        $private = $method !== 'GET' || preg_match('#^(account/|checkout/|api/|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
+        $private = $method !== 'GET' || preg_match('#^(account/|checkout/|api/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
         if ($private) {
             header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
             header('Pragma: no-cache');
@@ -274,7 +274,7 @@ class WebskyLightning {
         $route = self::detectedRoute($registry);
         $scope = $config ? $config->get('module_websky_lightning_cache_scope') : 'core';
         if ($scope === 'all') {
-            return !preg_match('#^(account/|checkout/|api/|sale/|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
+            return !preg_match('#^(account/|checkout/|api/|sale/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
         }
         return in_array($route, array('common/home', 'product/product', 'product/category'), true);
     }
