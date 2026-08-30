@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.16.9</version>
+  <version>1.17.0</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -38,6 +38,14 @@
       <search><![CDATA[$this->customer->logout();]]></search>
       <add position="after"><![CDATA[
 			header('Set-Cookie: websky_customer=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax', false);
+      ]]></add>
+    </operation>
+  </file>
+  <file path="system/library/cart/customer.php">
+    <operation error="skip">
+      <search><![CDATA[$this->session->data['customer_id'] = $customer_query->row['customer_id'];]]></search>
+      <add position="after"><![CDATA[
+			header('Set-Cookie: websky_customer=1; Path=/; Max-Age=86400; Secure; HttpOnly; SameSite=Lax', false);
       ]]></add>
     </operation>
   </file>
