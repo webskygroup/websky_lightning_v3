@@ -63,7 +63,17 @@ class WebskyLightning {
         if (!$request || headers_sent()) { return; }
         $method = isset($request->server['REQUEST_METHOD']) ? strtoupper((string)$request->server['REQUEST_METHOD']) : 'GET';
         $route = self::detectedRoute($registry);
-        $private = $method !== 'GET' || preg_match('#^(account/|checkout/|api/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
+        $session = $registry->get('session');
+        $loggedIn = $session && (!empty($session->data['customer_id']) || !empty($session->data['customer']));
+        $markedCustomer = !empty($_COOKIE['websky_customer']);
+        // Mark authenticated browsers so LiteSpeed can bypass its outer cache
+        // before PHP runs. OCSESSID alone is also present for guest visitors.
+        if ($loggedIn) {
+            header('Set-Cookie: websky_customer=1; Path=/; Max-Age=86400; Secure; HttpOnly; SameSite=Lax', false);
+        } elseif (!empty($_COOKIE['websky_customer'])) {
+            header('Set-Cookie: websky_customer=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax', false);
+        }
+        $private = $method !== 'GET' || $loggedIn || $markedCustomer || preg_match('#^(account/|checkout/|api/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
         if ($private) {
             header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
             header('Pragma: no-cache');
@@ -268,6 +278,7 @@ class WebskyLightning {
         if (!$request || !isset($request->server['REQUEST_METHOD']) || strtoupper($request->server['REQUEST_METHOD']) !== 'GET') { return false; }
         if (isset($request->get['websky_bypass'])) { return false; }
         if (!empty($request->server['HTTP_X_REQUESTED_WITH'])) { return false; }
+        if (!empty($_COOKIE['websky_customer'])) { return false; }
         // Anonymous sessions may contain OpenCart's guest marker. Keep them
         // on the shared page cache unless customer or cart state is present.
         if ($session && (!empty($session->data['customer_id']) || !empty($session->data['customer']) || !empty($session->data['cart']))) { return false; }
