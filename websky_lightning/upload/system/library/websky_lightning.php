@@ -32,6 +32,9 @@ class WebskyLightning {
                 header('X-Websky-Cache-Age: ' . (time() - filemtime($file)));
                 header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
                 header('Vary: Accept, Accept-Encoding', false);
+                // LiteSpeed needs its own vary signal; standard Vary alone is
+                // not sufficient for separate desktop/mobile objects.
+                header('X-LiteSpeed-Vary: User-Agent');
                 if ($useGzip && $serveFile === $gzipFile) {
                     @ini_set('zlib.output_compression', '0');
                     header('Content-Encoding: gzip');
@@ -47,6 +50,7 @@ class WebskyLightning {
             header('X-Websky-Cache: MISS');
             header('X-Websky-Cache-Profile: ' . self::cacheProfile($registry));
             header('Vary: Accept, Accept-Encoding', false);
+            header('X-LiteSpeed-Vary: User-Agent');
         }
         self::$captureFile = $file;
         self::$captureMeta = self::cacheMetadata($registry);
