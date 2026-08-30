@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.16.8</version>
+  <version>1.16.9</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -16,6 +16,29 @@
         }
 
         ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/controller/account/login.php">
+    <operation error="skip">
+      <search><![CDATA[if ($customer_info && $this->customer->login($customer_info['email'], '', true)) {]]></search>
+      <add position="after"><![CDATA[
+        header('Set-Cookie: websky_customer=1; Path=/; Max-Age=86400; Secure; HttpOnly; SameSite=Lax', false);
+      ]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[} else {
+				$this->model_account_customer->deleteLoginAttempts($this->request->post['email']);]]></search>
+      <add position="replace"><![CDATA[} else {
+				header('Set-Cookie: websky_customer=1; Path=/; Max-Age=86400; Secure; HttpOnly; SameSite=Lax', false);
+				$this->model_account_customer->deleteLoginAttempts($this->request->post['email']);]]></add>
+    </operation>
+  </file>
+  <file path="catalog/controller/account/logout.php">
+    <operation error="skip">
+      <search><![CDATA[$this->customer->logout();]]></search>
+      <add position="after"><![CDATA[
+			header('Set-Cookie: websky_customer=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax', false);
+      ]]></add>
     </operation>
   </file>
   <file path="system/library/db.php">

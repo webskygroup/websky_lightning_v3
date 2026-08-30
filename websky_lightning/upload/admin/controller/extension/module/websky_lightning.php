@@ -1,7 +1,7 @@
 <?php
 class ControllerExtensionModuleWebskyLightning extends Controller {
     private $error = array();
-    private $version = '1.16.8';
+    private $version = '1.16.9';
     private $version_extension = 'websky_lightning_v3';
     private $download_url = 'https://github.com/webskygroup/websky_lightning_v3/releases/latest/download/websky_lightning.ocmod.zip';
 
