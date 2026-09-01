@@ -2,6 +2,9 @@
 class WebskyLightning {
     private static $captureFile = '';
     private static $captureMeta = array();
+    private static $warmProductIds = array();
+    private static $warmCategoryIds = array();
+    private static $warmRegistered = false;
     public static function serve($registry) {
         if (!self::catalogRequest()) { return; }
         // Never allow an outer LiteSpeed/proxy cache to replay session state.
@@ -154,6 +157,7 @@ class WebskyLightning {
             self::invalidateDatabaseCache();
             if (self::catalogContentWrite($trimmed)) {
                 self::invalidatePageCacheForSql($trimmed);
+                self::scheduleChangedPageWarm($adaptor, $trimmed);
                 // Price/content updates can originate in admin, cron jobs or
                 // API synchronizers. Purge LiteSpeed regardless of entrypoint.
                 if (!headers_sent()) { header('X-LiteSpeed-Purge: *'); }
@@ -239,6 +243,47 @@ class WebskyLightning {
         // that statistic must not invalidate product/listing page caches.
         if (preg_match('/^UPDATE\s+[`\w]*product[`\w]*\s+SET\s+[`]?viewed[`]?\s*=\s*\(?\s*[`]?viewed[`]?\s*\+\s*1\s*\)?\s+WHERE\b/i', trim($sql))) { return false; }
         return true;
+    }
+
+    private static function scheduleChangedPageWarm($adaptor, $sql) {
+        foreach (self::sqlIds($sql, 'product_id') as $id) { self::$warmProductIds[$id] = $id; }
+        foreach (self::sqlIds($sql, 'category_id') as $id) { self::$warmCategoryIds[$id] = $id; }
+        if (self::$warmRegistered) { return; }
+        self::$warmRegistered = true;
+        register_shutdown_function(function() use ($adaptor) { self::warmChangedPages($adaptor); });
+    }
+
+    private static function warmChangedPages($adaptor) {
+        if (!self::$warmProductIds && !self::$warmCategoryIds) { return; }
+        $base = defined('HTTPS_CATALOG') ? HTTPS_CATALOG : (defined('HTTPS_SERVER') ? HTTPS_SERVER : '');
+        if (!$base) { return; }
+        $urls = array(rtrim($base, '/') . '/');
+        $queries = array();
+        foreach (self::$warmProductIds as $id) { $queries[] = "query = 'product_id=" . (int)$id . "'"; }
+        foreach (self::$warmCategoryIds as $id) { $queries[] = "query = 'category_id=" . (int)$id . "'"; }
+        // A product price appears in every listing; warm all category pages.
+        if (self::$warmProductIds) { $queries[] = "query LIKE 'category_id=%'"; }
+        if ($queries) {
+            $result = @$adaptor->query("SELECT keyword, query FROM `" . DB_PREFIX . "seo_url` WHERE store_id = 0 AND keyword <> '' AND (" . implode(' OR ', $queries) . ")");
+            if ($result && !empty($result->rows)) {
+                foreach ($result->rows as $row) { $urls[] = rtrim($base, '/') . '/' . ltrim((string)$row['keyword'], '/'); }
+            }
+        }
+        $urls = array_values(array_unique($urls));
+        $agents = array('Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Mozilla/5.0 (Linux; Android 13; Mobile)', 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X)');
+        $mh = function_exists('curl_multi_init') ? curl_multi_init() : false;
+        if (!$mh) { return; }
+        $handles = array();
+        foreach ($urls as $url) {
+            foreach ($agents as $agent) {
+                $ch = curl_init($url . (strpos($url, '?') === false ? '?' : '&') . 'websky_pregen=1');
+                curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_USERAGENT => $agent));
+                curl_multi_add_handle($mh, $ch); $handles[] = $ch;
+            }
+        }
+        $running = 0; do { curl_multi_exec($mh, $running); if ($running) { curl_multi_select($mh, 0.5); } } while ($running);
+        foreach ($handles as $ch) { curl_multi_remove_handle($mh, $ch); curl_close($ch); }
+        curl_multi_close($mh);
     }
 
     private static function sqlIds($sql, $column) {
