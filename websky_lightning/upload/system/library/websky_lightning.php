@@ -224,10 +224,10 @@ class WebskyLightning {
             $remove = false;
             if ($productChange) {
                 $remove = in_array($meta['route'], array('common/home', 'product/category'), true);
-                if ($meta['route'] === 'product/product' && (!$productIds || in_array((int)$meta['product_id'], $productIds, true))) { $remove = true; }
+                if ($meta['route'] === 'product/product' && (!$productIds || !(int)$meta['product_id'] || in_array((int)$meta['product_id'], $productIds, true))) { $remove = true; }
             }
             if ($categoryChange && in_array($meta['route'], array('common/home', 'product/category'), true)) {
-                $remove = !$categoryIds || $meta['route'] === 'common/home' || in_array((int)$meta['category_id'], $categoryIds, true);
+                $remove = !$categoryIds || $meta['route'] === 'common/home' || !(int)$meta['category_id'] || in_array((int)$meta['category_id'], $categoryIds, true);
             }
             if ($remove) { self::deletePageCacheFile(substr($metaFile, 0, -10)); }
         }
