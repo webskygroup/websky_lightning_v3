@@ -293,6 +293,9 @@ class WebskyLightning {
         if (!empty($request->server['HTTP_X_REQUESTED_WITH'])) { return false; }
         // Authenticated public pages may use a per-customer cache key. Cart,
         // account, checkout and API pages remain live/private.
+        // A stale marker without a valid OpenCart session must never fall back
+        // to the anonymous object (it would show login/cart state incorrectly).
+        if (!empty($_COOKIE['websky_customer']) && !self::authenticatedRequest($registry)) { return false; }
         if ($session && !empty($session->data['cart'])) { return false; }
         $route = self::detectedRoute($registry);
         $scope = $config ? $config->get('module_websky_lightning_cache_scope') : 'core';
