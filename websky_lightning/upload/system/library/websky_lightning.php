@@ -152,7 +152,14 @@ class WebskyLightning {
         if (preg_match('/^(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|CREATE|DROP|RENAME)\b/i', $trimmed)) {
             $result = $adaptor->query($sql);
             self::invalidateDatabaseCache();
-            if (self::adminRequest()) { self::invalidatePageCacheForSql($trimmed); }
+            if (self::adminRequest()) {
+                self::invalidatePageCacheForSql($trimmed);
+                // Product/category writes must also invalidate LiteSpeed's
+                // outer objects, otherwise stale prices remain visible.
+                if (preg_match('/\b[a-z0-9_]*product(?:_[a-z0-9_]+)?\b|\b[a-z0-9_]*category(?:_[a-z0-9_]+)?\b/i', $trimmed) && !headers_sent()) {
+                    header('X-LiteSpeed-Purge: *');
+                }
+            }
             return $result;
         }
 
