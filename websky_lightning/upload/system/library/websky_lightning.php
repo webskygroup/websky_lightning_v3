@@ -237,7 +237,7 @@ class WebskyLightning {
         if (!preg_match('/\b[a-z0-9_]*product(?:_[a-z0-9_]+)?\b|\b[a-z0-9_]*category(?:_[a-z0-9_]+)?\b/i', $sql)) { return false; }
         // OpenCart increments product.viewed on ordinary storefront visits;
         // that statistic must not invalidate product/listing page caches.
-        if (preg_match('/^UPDATE\s+[`\w]+product[`\s]+SET\s+[`]?viewed[`]?\s*=\s*[`]?viewed[`]?\s*\+\s*1\s+WHERE\b/i', trim($sql))) { return false; }
+        if (preg_match('/^UPDATE\s+[`\w]*product[`\w]*\s+SET\s+[`]?viewed[`]?\s*=\s*\(?\s*[`]?viewed[`]?\s*\+\s*1\s*\)?\s+WHERE\b/i', trim($sql))) { return false; }
         return true;
     }
 
