@@ -152,13 +152,11 @@ class WebskyLightning {
         if (preg_match('/^(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|CREATE|DROP|RENAME)\b/i', $trimmed)) {
             $result = $adaptor->query($sql);
             self::invalidateDatabaseCache();
-            if (self::adminRequest()) {
+            if (self::catalogContentWrite($trimmed)) {
                 self::invalidatePageCacheForSql($trimmed);
-                // Product/category writes must also invalidate LiteSpeed's
-                // outer objects, otherwise stale prices remain visible.
-                if (preg_match('/\b[a-z0-9_]*product(?:_[a-z0-9_]+)?\b|\b[a-z0-9_]*category(?:_[a-z0-9_]+)?\b/i', $trimmed) && !headers_sent()) {
-                    header('X-LiteSpeed-Purge: *');
-                }
+                // Price/content updates can originate in admin, cron jobs or
+                // API synchronizers. Purge LiteSpeed regardless of entrypoint.
+                if (!headers_sent()) { header('X-LiteSpeed-Purge: *'); }
             }
             return $result;
         }
@@ -233,6 +231,14 @@ class WebskyLightning {
             }
             if ($remove) { self::deletePageCacheFile(substr($metaFile, 0, -10)); }
         }
+    }
+
+    private static function catalogContentWrite($sql) {
+        if (!preg_match('/\b[a-z0-9_]*product(?:_[a-z0-9_]+)?\b|\b[a-z0-9_]*category(?:_[a-z0-9_]+)?\b/i', $sql)) { return false; }
+        // OpenCart increments product.viewed on ordinary storefront visits;
+        // that statistic must not invalidate product/listing page caches.
+        if (preg_match('/^UPDATE\s+[`\w]+product[`\s]+SET\s+[`]?viewed[`]?\s*=\s*[`]?viewed[`]?\s*\+\s*1\s+WHERE\b/i', trim($sql))) { return false; }
+        return true;
     }
 
     private static function sqlIds($sql, $column) {
