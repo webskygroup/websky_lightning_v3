@@ -5,6 +5,8 @@ class WebskyLightning {
     private static $warmProductIds = array();
     private static $warmCategoryIds = array();
     private static $warmRegistered = false;
+    private static $requestDbTime = 0.0;
+    private static $requestDbQueries = 0;
     public static function serve($registry) {
         if (!self::catalogRequest()) { return; }
         // Never allow an outer LiteSpeed/proxy cache to replay session state.
@@ -153,7 +155,7 @@ class WebskyLightning {
     public static function databaseQuery($adaptor, $sql) {
         $trimmed = ltrim((string)$sql);
         if (preg_match('/^(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|CREATE|DROP|RENAME)\b/i', $trimmed)) {
-            $result = $adaptor->query($sql);
+            $result = self::timedQuery($adaptor, $sql);
             // Cart/session writes do not change catalog read results. Avoid
             // taking the shared query-cache generation lock for every cart
             // mutation; real product/category writes still invalidate it.
@@ -174,7 +176,7 @@ class WebskyLightning {
         // any other non-GET request. These paths depend on live session,
         // stock, totals and payment state.
         if (self::privateRequest() || !defined('WEBSKY_LIGHTNING_QUERY_CACHE') || !WEBSKY_LIGHTNING_QUERY_CACHE || !self::cacheableDatabaseQuery($trimmed)) {
-            return $adaptor->query($sql);
+            return self::timedQuery($adaptor, $sql);
         }
 
         $dir = self::databaseCacheDirectory();
@@ -194,7 +196,7 @@ class WebskyLightning {
         }
 
         self::recordDatabaseCache('miss');
-        $query = $adaptor->query($sql);
+        $query = self::timedQuery($adaptor, $sql);
         if (is_object($query) && isset($query->rows, $query->num_rows)) {
             $payload = serialize(array('row' => isset($query->row) ? $query->row : array(), 'rows' => $query->rows, 'num_rows' => (int)$query->num_rows));
             $tmp = $file . '.' . getmypid() . '.tmp';
@@ -258,6 +260,18 @@ class WebskyLightning {
         if ($method !== 'GET') { return true; }
         $route = isset($_GET['route']) ? (string)$_GET['route'] : '';
         return (bool)preg_match('#^(account/|checkout/|api/|sale/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
+    }
+
+    private static function timedQuery($adaptor, $sql) {
+        $started = microtime(true);
+        $result = $adaptor->query($sql);
+        self::$requestDbTime += microtime(true) - $started;
+        self::$requestDbQueries++;
+        if (self::privateRequest() && !headers_sent()) {
+            header('X-Websky-DB-Time-ms: ' . (int)round(self::$requestDbTime * 1000));
+            header('X-Websky-DB-Queries: ' . self::$requestDbQueries);
+        }
+        return $result;
     }
 
     private static function isProductViewCounterUpdate($sql) {
