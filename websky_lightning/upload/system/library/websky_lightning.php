@@ -154,7 +154,12 @@ class WebskyLightning {
         $trimmed = ltrim((string)$sql);
         if (preg_match('/^(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|CREATE|DROP|RENAME)\b/i', $trimmed)) {
             $result = $adaptor->query($sql);
-            self::invalidateDatabaseCache();
+            // Cart/session writes do not change catalog read results. Avoid
+            // taking the shared query-cache generation lock for every cart
+            // mutation; real product/category writes still invalidate it.
+            if (!self::privateRequest() || self::catalogContentWrite($trimmed)) {
+                self::invalidateDatabaseCache();
+            }
             if (self::catalogContentWrite($trimmed)) {
                 self::invalidatePageCacheForSql($trimmed);
                 self::scheduleChangedPageWarm($adaptor, $trimmed);
@@ -165,7 +170,10 @@ class WebskyLightning {
             return $result;
         }
 
-        if (!defined('WEBSKY_LIGHTNING_QUERY_CACHE') || !WEBSKY_LIGHTNING_QUERY_CACHE || !self::cacheableDatabaseQuery($trimmed)) {
+        // Never reuse a cached SELECT inside cart, checkout, account, API or
+        // any other non-GET request. These paths depend on live session,
+        // stock, totals and payment state.
+        if (self::privateRequest() || !defined('WEBSKY_LIGHTNING_QUERY_CACHE') || !WEBSKY_LIGHTNING_QUERY_CACHE || !self::cacheableDatabaseQuery($trimmed)) {
             return $adaptor->query($sql);
         }
 
@@ -243,6 +251,13 @@ class WebskyLightning {
         // that statistic must not invalidate product/listing page caches.
         if (self::isProductViewCounterUpdate($sql)) { return false; }
         return true;
+    }
+
+    private static function privateRequest() {
+        $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string)$_SERVER['REQUEST_METHOD']) : 'GET';
+        if ($method !== 'GET') { return true; }
+        $route = isset($_GET['route']) ? (string)$_GET['route'] : '';
+        return (bool)preg_match('#^(account/|checkout/|api/|sale/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
     }
 
     private static function isProductViewCounterUpdate($sql) {
