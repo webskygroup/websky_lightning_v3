@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.19.0</version>
+  <version>1.19.1</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -171,6 +171,19 @@
       <search><![CDATA[echo $this->output;]]></search>
       <add position="before"><![CDATA[if (!headers_sent()) { header('X-Websky-Response-ms: ' . (int)round((microtime(true) - $websky_response_started) * 1000)); }
       ]]></add>
+    </operation>
+  </file>
+  <file path="system/engine/action.php">
+    <operation error="skip">
+      <search><![CDATA[return call_user_func_array(array($controller, $this->method), $args);]]></search>
+      <add position="replace"><![CDATA[$websky_action_started = microtime(true);
+			$result = call_user_func_array(array($controller, $this->method), $args);
+			$websky_action_ms = (int)round((microtime(true) - $websky_action_started) * 1000);
+			if ($websky_action_ms >= 100 && !headers_sent()) {
+				$websky_action_id = preg_replace('/[^A-Za-z0-9_.-]/', '-', (string)$this->id);
+				header('X-Websky-Slow-Action-' . substr(hash('sha1', $websky_action_id), 0, 10) . ': ' . substr($websky_action_id, 0, 100) . '=' . $websky_action_ms);
+			}
+			return $result;]]></add>
     </operation>
   </file>
   <file path="admin/view/template/common/header.twig">
