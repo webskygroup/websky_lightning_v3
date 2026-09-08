@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.19.2</version>
+  <version>1.19.3</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -127,63 +127,6 @@
       <add position="after"><![CDATA[
         $this->webskyProductsCache = null;
       ]]></add>
-    </operation>
-  </file>
-  <file path="catalog/controller/checkout/cart.php">
-    <operation error="skip">
-      <search><![CDATA[$this->cart->add($this->request->post['product_id'], $quantity, $option, $recurring_id);]]></search>
-      <add position="replace"><![CDATA[$websky_cart_add_started = microtime(true);
-				$this->cart->add($this->request->post['product_id'], $quantity, $option, $recurring_id);
-				if (!headers_sent()) { header('X-Websky-Cart-Add-ms: ' . (int)round((microtime(true) - $websky_cart_add_started) * 1000)); }]]></add>
-    </operation>
-    <operation error="skip">
-      <search><![CDATA[$taxes = $this->cart->getTaxes();]]></search>
-      <add position="replace"><![CDATA[$websky_taxes_started = microtime(true);
-			$taxes = $this->cart->getTaxes();
-			if (!headers_sent()) { header('X-Websky-Cart-Taxes-ms: ' . (int)round((microtime(true) - $websky_taxes_started) * 1000)); }]]></add>
-    </operation>
-    <operation error="skip">
-      <search><![CDATA[$this->{'model_extension_total_' . $result['code']}->getTotal($total_data);]]></search>
-      <add position="replace"><![CDATA[$websky_total_started = microtime(true);
-							$this->{'model_extension_total_' . $result['code']}->getTotal($total_data);
-							if (!headers_sent()) { header('X-Websky-Total-' . preg_replace('/[^A-Za-z0-9-]/', '-', $result['code']) . '-ms: ' . (int)round((microtime(true) - $websky_total_started) * 1000)); }]]></add>
-    </operation>
-  </file>
-  <file path="system/engine/event.php">
-    <operation error="skip">
-      <search><![CDATA[$result = $value['action']->execute($this->registry, $args);]]></search>
-      <add position="replace"><![CDATA[$websky_event_started = microtime(true);
-				$result = $value['action']->execute($this->registry, $args);
-				$websky_event_ms = (int)round((microtime(true) - $websky_event_started) * 1000);
-				if ($websky_event_ms >= 100 && !headers_sent()) {
-					$websky_event_id = preg_replace('/[^A-Za-z0-9_.-]/', '-', (string)$value['action']->getId());
-					header('X-Websky-Slow-Event-' . substr(hash('sha1', $websky_event_id), 0, 10) . ': ' . substr($websky_event_id, 0, 100) . '=' . $websky_event_ms);
-				}]]></add>
-    </operation>
-  </file>
-  <file path="system/library/response.php">
-    <operation error="skip">
-      <search><![CDATA[if ($this->output) {]]></search>
-      <add position="before"><![CDATA[$websky_response_started = microtime(true);
-      ]]></add>
-    </operation>
-    <operation error="skip">
-      <search><![CDATA[echo $this->output;]]></search>
-      <add position="before"><![CDATA[if (!headers_sent()) { header('X-Websky-Response-ms: ' . (int)round((microtime(true) - $websky_response_started) * 1000)); }
-      ]]></add>
-    </operation>
-  </file>
-  <file path="system/engine/action.php">
-    <operation error="skip">
-      <search><![CDATA[return call_user_func_array(array($controller, $this->method), $args);]]></search>
-      <add position="replace"><![CDATA[$websky_action_started = microtime(true);
-			$result = call_user_func_array(array($controller, $this->method), $args);
-			$websky_action_ms = (int)round((microtime(true) - $websky_action_started) * 1000);
-			if ($websky_action_ms >= 100 && !headers_sent()) {
-				$websky_action_id = preg_replace('/[^A-Za-z0-9_.-]/', '-', (string)$this->id);
-				header('X-Websky-Slow-Action-' . substr(hash('sha1', $websky_action_id), 0, 10) . ': ' . substr($websky_action_id, 0, 100) . '=' . $websky_action_ms);
-			}
-			return $result;]]></add>
     </operation>
   </file>
   <file path="admin/view/template/common/header.twig">
