@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.18.7</version>
+  <version>1.18.8</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -127,6 +127,26 @@
       <add position="after"><![CDATA[
         $this->webskyProductsCache = null;
       ]]></add>
+    </operation>
+  </file>
+  <file path="catalog/controller/checkout/cart.php">
+    <operation error="skip">
+      <search><![CDATA[$this->cart->add($this->request->post['product_id'], $quantity, $option, $recurring_id);]]></search>
+      <add position="replace"><![CDATA[$websky_cart_add_started = microtime(true);
+				$this->cart->add($this->request->post['product_id'], $quantity, $option, $recurring_id);
+				if (!headers_sent()) { header('X-Websky-Cart-Add-ms: ' . (int)round((microtime(true) - $websky_cart_add_started) * 1000)); }]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[$taxes = $this->cart->getTaxes();]]></search>
+      <add position="replace"><![CDATA[$websky_taxes_started = microtime(true);
+			$taxes = $this->cart->getTaxes();
+			if (!headers_sent()) { header('X-Websky-Cart-Taxes-ms: ' . (int)round((microtime(true) - $websky_taxes_started) * 1000)); }]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[$this->{'model_extension_total_' . $result['code']}->getTotal($total_data);]]></search>
+      <add position="replace"><![CDATA[$websky_total_started = microtime(true);
+							$this->{'model_extension_total_' . $result['code']}->getTotal($total_data);
+							if (!headers_sent()) { header('X-Websky-Total-' . preg_replace('/[^A-Za-z0-9-]/', '-', $result['code']) . '-ms: ' . (int)round((microtime(true) - $websky_total_started) * 1000)); }]]></add>
     </operation>
   </file>
   <file path="admin/view/template/common/header.twig">
