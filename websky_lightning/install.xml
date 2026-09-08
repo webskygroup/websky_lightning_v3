@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.19.4</version>
+  <version>1.19.5</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -19,6 +19,18 @@
     </operation>
   </file>
   <file path="catalog/controller/account/login.php">
+    <operation error="skip">
+      <search><![CDATA[$this->response->redirect($this->url->link('account/account', '', true));]]></search>
+      <add position="replace"><![CDATA[$websky_auth_url = $this->url->link('account/account', '', true);
+                $websky_auth_url .= (strpos($websky_auth_url, '?') === false ? '?' : '&') . 'websky_auth=' . time();
+                $this->response->redirect($websky_auth_url);]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[$this->response->redirect(str_replace('&amp;', '&', $this->request->post['redirect']));]]></search>
+      <add position="replace"><![CDATA[$websky_auth_url = str_replace('&amp;', '&', $this->request->post['redirect']);
+                $websky_auth_url .= (strpos($websky_auth_url, '?') === false ? '?' : '&') . 'websky_auth=' . time();
+                $this->response->redirect($websky_auth_url);]]></add>
+    </operation>
     <operation error="skip">
       <search><![CDATA[if ($customer_info && $this->customer->login($customer_info['email'], '', true)) {]]></search>
       <add position="after"><![CDATA[
