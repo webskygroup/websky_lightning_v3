@@ -248,7 +248,10 @@ class WebskyLightning {
     }
 
     private static function catalogContentWrite($sql) {
-        if (!preg_match('/\b[a-z0-9_]*product(?:_[a-z0-9_]+)?\b|\b[a-z0-9_]*category(?:_[a-z0-9_]+)?\b/i', $sql)) { return false; }
+        // Match the written table, not a product_id/category_id column in a
+        // cart/session row. Cart writes used to trigger full catalog warming
+        // during shutdown and made checkout/cart/add take many seconds.
+        if (!preg_match('/^(?:UPDATE\s+|(?:INSERT|REPLACE)\s+INTO\s+|DELETE\s+FROM\s+)[`a-z0-9_]*(?:product|category)(?:_[a-z0-9_]+)?`?\b/i', trim((string)$sql))) { return false; }
         // OpenCart increments product.viewed on ordinary storefront visits;
         // that statistic must not invalidate product/listing page caches.
         if (self::isProductViewCounterUpdate($sql)) { return false; }
