@@ -85,6 +85,10 @@ class WebskyLightning {
         } elseif (!empty($_COOKIE['websky_customer'])) {
             header('Set-Cookie: websky_customer=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax', false);
         }
+        if ($loggedIn && !empty($_COOKIE['websky_auth_refresh'])) {
+            header('Clear-Site-Data: "cache"');
+            header('Set-Cookie: websky_auth_refresh=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax', false);
+        }
         $hasCart = $session && !empty($session->data['cart']);
         $private = $method !== 'GET' || $markedCustomer && !$loggedIn || $hasCart || preg_match('#^(account/|checkout/|api/|common/cart(?:/|$)|common/login|common/logout|extension/payment/|extension/total/)#i', $route);
         if ($private) {
