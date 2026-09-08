@@ -111,6 +111,9 @@ class WebskyLightning {
         if (!empty(self::$captureMeta['route']) && self::$captureMeta['route'] === 'common/home') {
             $content = self::optimizeHomeHtml($content);
         }
+        if (!empty(self::$captureMeta['route']) && self::$captureMeta['route'] === 'product/product') {
+            $content = self::optimizeProductHtml($content);
+        }
         if (strlen($content) > 2 && substr($content, 0, 2) === "\x1f\x8b" && function_exists('gzdecode')) {
             $decoded = @gzdecode($content);
             if (is_string($decoded)) { $content = $decoded; }
@@ -156,6 +159,29 @@ class WebskyLightning {
             }, $attrs);
             return '<img loading="lazy" decoding="async"' . $attrs . '>';
         }, $html);
+        return $html;
+    }
+
+    private static function optimizeProductHtml($html) {
+        // Product reviews load reCAPTCHA immediately even when the review
+        // section is far below the fold. Defer that AJAX fragment until the
+        // section approaches the viewport, preserving normal review behavior.
+        $html = preg_replace_callback('/\$\(["\']#review["\']\)\.load\((["\'])(index\.php\?route=product\/extended_reviews\/review[^"\']*)\1\);/i', function ($match) {
+            $url = json_encode(html_entity_decode($match[2], ENT_QUOTES, 'UTF-8'));
+            return '(function(){var loaded=false,load=function(){if(loaded)return;loaded=true;$("#review").load(' . $url . ');};var el=document.getElementById("review");if(el&&"IntersectionObserver" in window){var io=new IntersectionObserver(function(e){if(e[0]&&e[0].isIntersecting){io.disconnect();load();}},{rootMargin:"400px"});io.observe(el);}else{setTimeout(load,3000);}})();';
+        }, $html, 1);
+
+        // Analytics must not delay the page load event. Its queue remains
+        // available immediately; the network script starts after first paint.
+        $html = preg_replace_callback('/<script\s+async\s+src=(["\'])(https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=[^"\']+)\1><\/script>/i', function ($match) {
+            $src = json_encode($match[2]);
+            return '<script>window.addEventListener("load",function(){setTimeout(function(){var s=document.createElement("script");s.async=true;s.src=' . $src . ';document.head.appendChild(s);},1200);});</script>';
+        }, $html, 1);
+
+        // Clarity is noncritical telemetry. Start it after the initial load so
+        // a slow third-party connection cannot hold the product page open.
+        $html = str_replace('t.async=1;t.src="https://www.clarity.ms/tag/"+i;', 't.async=1;t.dataset.webskySrc="https://www.clarity.ms/tag/"+i;', $html);
+        $html = str_replace('y.parentNode.insertBefore(t,y);', 'window.addEventListener("load",function(){setTimeout(function(){t.src=t.dataset.webskySrc;y.parentNode.insertBefore(t,y);},1500);});', $html);
         return $html;
     }
 
