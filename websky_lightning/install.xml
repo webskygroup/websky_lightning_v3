@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.18.8</version>
+  <version>1.18.9</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -147,6 +147,18 @@
       <add position="replace"><![CDATA[$websky_total_started = microtime(true);
 							$this->{'model_extension_total_' . $result['code']}->getTotal($total_data);
 							if (!headers_sent()) { header('X-Websky-Total-' . preg_replace('/[^A-Za-z0-9-]/', '-', $result['code']) . '-ms: ' . (int)round((microtime(true) - $websky_total_started) * 1000)); }]]></add>
+    </operation>
+  </file>
+  <file path="system/engine/event.php">
+    <operation error="skip">
+      <search><![CDATA[$result = $value['action']->execute($this->registry, $args);]]></search>
+      <add position="replace"><![CDATA[$websky_event_started = microtime(true);
+				$result = $value['action']->execute($this->registry, $args);
+				$websky_event_ms = (int)round((microtime(true) - $websky_event_started) * 1000);
+				if ($websky_event_ms >= 100 && !headers_sent()) {
+					$websky_event_id = preg_replace('/[^A-Za-z0-9_.-]/', '-', (string)$value['action']->getId());
+					header('X-Websky-Slow-Event-' . substr(hash('sha1', $websky_event_id), 0, 10) . ': ' . substr($websky_event_id, 0, 100) . '=' . $websky_event_ms);
+				}]]></add>
     </operation>
   </file>
   <file path="admin/view/template/common/header.twig">
