@@ -2,7 +2,7 @@
 <modification>
   <name>Websky Lightning</name>
   <code>websky_lightning</code>
-  <version>1.18.9</version>
+  <version>1.19.0</version>
   <author>Websky</author>
   <link>https://github.com/webskygroup</link>
   <file path="catalog/controller/startup/startup.php">
@@ -159,6 +159,18 @@
 					$websky_event_id = preg_replace('/[^A-Za-z0-9_.-]/', '-', (string)$value['action']->getId());
 					header('X-Websky-Slow-Event-' . substr(hash('sha1', $websky_event_id), 0, 10) . ': ' . substr($websky_event_id, 0, 100) . '=' . $websky_event_ms);
 				}]]></add>
+    </operation>
+  </file>
+  <file path="system/library/response.php">
+    <operation error="skip">
+      <search><![CDATA[if ($this->output) {]]></search>
+      <add position="before"><![CDATA[$websky_response_started = microtime(true);
+      ]]></add>
+    </operation>
+    <operation error="skip">
+      <search><![CDATA[echo $this->output;]]></search>
+      <add position="before"><![CDATA[if (!headers_sent()) { header('X-Websky-Response-ms: ' . (int)round((microtime(true) - $websky_response_started) * 1000)); }
+      ]]></add>
     </operation>
   </file>
   <file path="admin/view/template/common/header.twig">
