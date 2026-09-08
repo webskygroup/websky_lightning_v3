@@ -26,11 +26,15 @@ class WebskyLightning {
             $serveFile = $useGzip && is_file($gzipFile) && filemtime($gzipFile) >= filemtime($file) ? $gzipFile : $file;
             $content = @file_get_contents($serveFile);
             if (!is_string($content)) { return; }
-            $authenticated = self::authenticatedRequest($registry) || !empty($_COOKIE['websky_customer']);
             if (!headers_sent()) {
                 @header_remove('Set-Cookie');
                 @header_remove('Pragma');
-                header($authenticated ? 'Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0' : 'Cache-Control: public, max-age=31536000, immutable');
+                // The HTML may contain login and cart state. Keep the fast
+                // server-side file cache, but never persist a guest document
+                // in the browser across a later login/cart mutation.
+                header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+                header('Pragma: no-cache');
+                header('Expires: 0');
                 header('X-LiteSpeed-Cache-Control: no-cache');
                 header('X-Websky-Cache: HIT');
                 header('X-Websky-Cache-Age: ' . (time() - filemtime($file)));
