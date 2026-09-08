@@ -108,6 +108,9 @@ class WebskyLightning {
 
     public static function capture($output) {
         $content = $output;
+        if (!empty(self::$captureMeta['route']) && self::$captureMeta['route'] === 'common/home') {
+            $content = self::optimizeHomeHtml($content);
+        }
         if (strlen($content) > 2 && substr($content, 0, 2) === "\x1f\x8b" && function_exists('gzdecode')) {
             $decoded = @gzdecode($content);
             if (is_string($decoded)) { $content = $decoded; }
@@ -133,6 +136,27 @@ class WebskyLightning {
             return gzencode($content, 6);
         }
         return $output;
+    }
+
+    private static function optimizeHomeHtml($html) {
+        // Journal emits many slider/product images and 2x candidates before
+        // the browser has painted the first viewport. Keep the first three
+        // images eager and let the rest load as they approach the viewport.
+        $index = 0;
+        $html = preg_replace_callback('/<img\b([^>]*)>/i', function ($match) use (&$index) {
+            $attrs = $match[1];
+            if ($index++ < 3) {
+                if (stripos($attrs, 'fetchpriority=') === false) { $attrs .= ' fetchpriority="high"'; }
+                return '<img' . $attrs . '>';
+            }
+            $attrs = preg_replace('/\s+loading\s*=\s*["\'][^"\']*["\']/i', '', $attrs);
+            $attrs = preg_replace('/\s+srcset\s*=\s*(["\'])(.*?)\1/i', function ($src) {
+                $value = preg_replace('/\s*,?\s*[^,\s]+3960x1300[^,\s]*\s+2x/i', '', $src[2]);
+                return ' srcset=' . $src[1] . trim($value) . $src[1];
+            }, $attrs);
+            return '<img loading="lazy" decoding="async"' . $attrs . '>';
+        }, $html);
+        return $html;
     }
 
     public static function webp($file) {
