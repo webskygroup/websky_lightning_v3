@@ -76,7 +76,7 @@ class WebskyLightning {
         $method = isset($request->server['REQUEST_METHOD']) ? strtoupper((string)$request->server['REQUEST_METHOD']) : 'GET';
         $route = self::detectedRoute($registry);
         $session = $registry->get('session');
-        $loggedIn = $session && (!empty($session->data['customer_id']) || !empty($session->data['customer']));
+        $loggedIn = self::authenticatedRequest($registry);
         $markedCustomer = !empty($_COOKIE['websky_customer']);
         // Mark authenticated browsers so LiteSpeed can bypass its outer cache
         // before PHP runs. OCSESSID alone is also present for guest visitors.
@@ -93,6 +93,12 @@ class WebskyLightning {
             header('Expires: 0');
             header('X-LiteSpeed-Cache-Control: no-cache, no-store');
             header('X-Websky-Cache: BYPASS');
+        }
+        // Rotate the authenticated page-cache identity whenever cart state is
+        // mutated. The following GET then builds/serves the correct cart badge
+        // without sharing HTML between customers or cart revisions.
+        if ($loggedIn && $method !== 'GET' && preg_match('#^(checkout/cart(?:/|$)|common/cart(?:/|$))#i', $route)) {
+            header('Set-Cookie: websky_cart_version=' . rawurlencode((string)microtime(true)) . '; Path=/; Max-Age=86400; Secure; HttpOnly; SameSite=Lax', false);
         }
     }
 
@@ -381,7 +387,7 @@ class WebskyLightning {
         // A stale marker without a valid OpenCart session must never fall back
         // to the anonymous object (it would show login/cart state incorrectly).
         if (!empty($_COOKIE['websky_customer']) && !self::authenticatedRequest($registry)) { return false; }
-        if ($session && !empty($session->data['cart'])) { return false; }
+        if ($session && !empty($session->data['cart']) && !self::authenticatedRequest($registry)) { return false; }
         $route = self::detectedRoute($registry);
         $scope = $config ? $config->get('module_websky_lightning_cache_scope') : 'core';
         if ($scope === 'all') {
@@ -425,16 +431,26 @@ class WebskyLightning {
         $scope = $config->get('module_websky_lightning_cache_scope') === 'all' ? 'all' : 'core';
         $device = self::deviceClass($request);
         $customerGroup = self::customerGroupId($registry);
-        $session = $registry->get('session');
-        $customerId = $session && isset($session->data['customer_id']) ? (int)$session->data['customer_id'] : 0;
-        $identity = $customerId > 0 ? 'customer-' . $customerId : 'group-' . $customerGroup;
+        $customerId = self::customerId($registry);
+        $cartVersion = $customerId > 0 && isset($_COOKIE['websky_cart_version']) ? (string)$_COOKIE['websky_cart_version'] : '';
+        $identity = $customerId > 0 ? 'customer-' . $customerId . '-cart-' . hash('sha256', $cartVersion) : 'group-' . $customerGroup;
         $key = (int)$config->get('config_store_id') . '|' . $language . '|' . $currency . '|' . $scope . '|' . $identity . '|' . $device . '|' . $uri;
         return self::cacheDirectory() . $scope . '_' . hash('sha256', $key) . '.html';
     }
 
     private static function authenticatedRequest($registry) {
         $session = $registry->get('session');
-        return $session && (!empty($session->data['customer_id']) || !empty($session->data['customer'])) && empty($session->data['cart']);
+        if ($session && (!empty($session->data['customer_id']) || !empty($session->data['customer']))) { return true; }
+        $customer = $registry->get('customer');
+        return $customer && method_exists($customer, 'isLogged') && $customer->isLogged();
+    }
+
+    private static function customerId($registry) {
+        $session = $registry->get('session');
+        if ($session && !empty($session->data['customer_id'])) { return (int)$session->data['customer_id']; }
+        $customer = $registry->get('customer');
+        if ($customer && method_exists($customer, 'getId')) { return (int)$customer->getId(); }
+        return 0;
     }
 
     private static function cacheMetadata($registry) {
