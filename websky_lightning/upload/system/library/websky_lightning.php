@@ -111,9 +111,9 @@ class WebskyLightning {
         if (!empty(self::$captureMeta['route']) && self::$captureMeta['route'] === 'common/home') {
             $content = self::optimizeHomeHtml($content);
         }
-        if (!empty(self::$captureMeta['route']) && self::$captureMeta['route'] === 'product/product') {
-            $content = self::optimizeProductHtml($content);
-        }
+        // These replacements are pattern-scoped, so apply them regardless of
+        // when SEO routing populated the captured route metadata.
+        $content = self::optimizeProductHtml($content);
         if (strlen($content) > 2 && substr($content, 0, 2) === "\x1f\x8b" && function_exists('gzdecode')) {
             $decoded = @gzdecode($content);
             if (is_string($decoded)) { $content = $decoded; }
