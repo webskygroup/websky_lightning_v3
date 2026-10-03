@@ -55,3 +55,4 @@ jobs:
           protocol: ftp
           local-dir: dist/
           server-dir: /public_html/dl/v3/
+          state-name: .ftp-deploy-sync-state-websky_lightning_v3-upload-1.json
